@@ -6,7 +6,7 @@ import Layout from '../layouts/Layout.astro';
   <div class="pc-container">
     <div class="card pc-card">
       <header class="card-header">
-        <h1 class="logo">Ray<span class="dot">.</span></h1>
+        <img src="/logo-ray.png" alt="Ray App Logo" class="app-logo" />
         <div class="live-indicator">
           <div id="status-dot" class="status-dot"></div>
           <span id="status-text">Esperando agente...</span>
@@ -88,8 +88,9 @@ import Layout from '../layouts/Layout.astro';
     box-shadow: 0 30px 60px rgba(0,0,0,0.5); border-radius: 24px;
   }
   .card-header {
-    display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;
   }
+  .app-logo { height: 60px; width: auto; filter: drop-shadow(0 0 15px var(--accent-glow)); }
   .live-indicator { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-muted); }
   .label {
     font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;
