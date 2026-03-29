@@ -43,6 +43,7 @@ def build():
         "--onefile",
         "--windowed",
         "--name=RayAgent",
+        "--icon=logo.ico",
         f"--add-data={add_data}",
     ]
 
