@@ -203,8 +203,7 @@ def run_agent_thread():
 # Acciones del menú
 # ────────────────────────────────────────────────
 def open_web(icon, item):
-    room_code = os.getenv("ROOM_CODE", "")
-    webbrowser.open(f"https://ray-app-wine.vercel.app?code={room_code}")
+    webbrowser.open("https://ray-app-wine.vercel.app")
 
 def copy_code(icon, item):
     try:
@@ -273,7 +272,7 @@ def main():
     agent_thread.start()
 
     # Paso 5: Abrir panel web automáticamente
-    webbrowser.open(f"https://ray-app-wine.vercel.app?code={room_code}")
+    webbrowser.open("https://ray-app-wine.vercel.app")
 
     # Paso 6: Construir menú de bandeja
     menu = pystray.Menu(
