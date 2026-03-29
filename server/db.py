@@ -6,10 +6,15 @@ from supabase import create_client, Client
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 def get_client() -> Client:
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_KEY")
-    if not url or not key:
-        raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in .env")
+    # Cargar .env si existe para desarrollo
+    load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
+    
+    url = os.getenv("SUPABASE_URL") or "https://wnxuozsztttajoamhmmd.supabase.co"
+    key = os.getenv("SUPABASE_KEY") or (
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+        ".eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndueHVvenN6dHR0YWpvYW1obW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MDM1MzgsImV4cCI6MjA4OTk3OTUzOH0"
+        ".cRIDgZfnjrVuDprxubj_PDYvlN8j62Oyvhn8KhJh4oM"
+    )
     return create_client(url, key)
 
 def get_room_by_code(room_code):

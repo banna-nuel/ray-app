@@ -183,7 +183,7 @@ import Layout from '../../layouts/Layout.astro';
       chatArea.innerHTML = '';
       data.forEach((cmd: any) => {
         addBubble(cmd.input, 'user');
-        if (cmd.output) addBubble(cmd.output, 'ray');
+        if (cmd.message) addBubble(cmd.message, 'ray');
       });
     }
   }
@@ -200,7 +200,7 @@ import Layout from '../../layouts/Layout.astro';
       if (cmd.status === 'done' || cmd.status === 'error') {
         const typing = document.getElementById('typing');
         if (typing) typing.remove();
-        if (cmd.output) addBubble(cmd.output, 'ray');
+        if (cmd.message) addBubble(cmd.message, 'ray');
       }
     })
     .subscribe();

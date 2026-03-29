@@ -57,7 +57,7 @@ def build():
         "matplotlib", "sklearn", "cv2", "transformers",
         "torchaudio", "torchvision", "tensorboard",
         "keras", "jax", "IPython", "notebook", "jupyterlab",
-        "pytest", "unittest", "tkinter",
+        "pytest", "unittest",
     ]
     for exc in excludes:
         cmd.append(f"--exclude-module={exc}")

@@ -19,10 +19,18 @@ import Layout from '../layouts/Layout.astro';
       </div>
 
       <!-- QR CODE -->
-      <div class="qr-section">
-        <canvas id="qr-canvas"></canvas>
-        <p class="qr-hint">Escanea con Ray App en tu celular</p>
-      </div>
+      <canvas id="qrcode" style="margin: 20px auto; display: block;"></canvas>
+      <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+      <script is:inline>
+        document.addEventListener('DOMContentLoaded', () => {
+          const code = localStorage.getItem('room_code') || 'RAY-XXXX';
+          QRCode.toCanvas(
+            document.getElementById('qrcode'),
+            'https://ray-app-wine.vercel.app/app?code=' + code,
+            { width: 200, color: { dark: '#6c63ff', light: '#ffffff' } }
+          );
+        });
+      </script>
 
       <footer class="card-footer">
         <div class="agent-row">
@@ -44,7 +52,7 @@ import Layout from '../layouts/Layout.astro';
   </div>
 </Layout>
 
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" is:inline></script>
+
 
 <style>
   .pc-container {

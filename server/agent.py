@@ -44,7 +44,13 @@ def signal_handler(sig, frame):
     print("\n⏹ Deteniendo agente...")
     running = False
 
-signal.signal(signal.SIGINT, signal_handler)
+def setup_signals():
+    """Register signal handlers only if in the main thread."""
+    try:
+        import signal
+        signal.signal(signal.SIGINT, signal_handler)
+    except (ValueError, ImportError):
+        pass  # Running in a thread or signal not available
 
 def heartbeat_loop(room_code):
     """Periodically update room status."""
@@ -117,10 +123,11 @@ def main():
         sys.exit(1)
 
     # Open Dashboard in Browser automatically
-    # Update this URL based on your Vercel deployment if needed
-    web_url = f"https://ray-app-wine.vercel.app/pc/?code={room_code}"
+    # El usuario pidió que la URL sea https://ray-app-wine.vercel.app?code={room_code}
+    web_url = f"https://ray-app-wine.vercel.app?code={room_code}"
     print(f"  🌐 Abriendo panel web: {web_url}")
     try:
+        import webbrowser
         webbrowser.open(web_url)
     except:
         pass
@@ -147,5 +154,6 @@ def main():
         print("  ✓ Agente desconectado.")
 
 if __name__ == "__main__":
+    setup_signals()
     main()
 
