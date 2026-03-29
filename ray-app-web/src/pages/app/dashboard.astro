@@ -1,0 +1,282 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Mis PCs">
+  <div class="dash-screen">
+    <header class="app-header">
+      <div class="logo" style="font-size:24px;">Ray<span class="dot">.</span></div>
+      <div class="header-right">
+        <span id="user-email" class="user-email"></span>
+        <button id="btn-logout" class="btn-icon" title="Cerrar sesión">🚪</button>
+      </div>
+    </header>
+
+    <main class="dash-content">
+      <h2 class="section-title">Mis PCs</h2>
+      <div id="pc-list" class="pc-grid">
+        <div class="loading">Sincronizando...</div>
+      </div>
+    </main>
+
+    <button id="btn-add" class="fab">+</button>
+
+    <!-- MODAL CONECTAR -->
+    <div id="modal-connect" class="modal-overlay">
+      <div class="modal">
+        <button id="btn-close-modal" class="modal-close">×</button>
+        <h2>Conectar PC</h2>
+
+        <div id="qr-section">
+          <button id="btn-scan" class="btn-secondary">📷 Escanear QR</button>
+          <div id="qr-preview" class="qr-preview hidden">
+            <video id="qr-video" autoplay playsinline></video>
+            <canvas id="qr-canvas" style="display:none;"></canvas>
+            <div class="qr-frame"></div>
+            <button id="btn-stop-scan" class="btn-stop">✕ Cerrar cámara</button>
+          </div>
+          <div id="qr-status" class="qr-status hidden"></div>
+        </div>
+
+        <div class="divider"><span>o ingresa manualmente</span></div>
+
+        <input type="text" id="input-code" placeholder="RAY-XXXX" maxlength="8">
+        <div id="link-error" class="error-text hidden"></div>
+        <button id="btn-link" class="btn-primary" style="margin-top:12px;">Conectar</button>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" is:inline></script>
+
+<style>
+  .dash-screen { height: 100vh; display: flex; flex-direction: column; max-width: 500px; margin: 0 auto; }
+  .app-header {
+    padding: 20px 24px; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border); background: var(--card);
+  }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .user-email { font-size: 0.8rem; color: var(--text-muted); }
+  .btn-icon { background: none; border: none; font-size: 20px; cursor: pointer; }
+  .dash-content { flex: 1; overflow-y: auto; padding: 24px; }
+  .section-title { font-size: 1.4rem; margin-bottom: 20px; }
+  .pc-grid { display: flex; flex-direction: column; gap: 14px; }
+  .loading { text-align: center; color: var(--text-muted); padding: 40px; }
+
+  .pc-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .pc-card-top { display: flex; justify-content: space-between; align-items: center; }
+  .pc-name { font-weight: 600; font-size: 1rem; }
+  .code-tag { font-family: monospace; background: var(--surface); padding: 4px 10px; border-radius: 6px; color: var(--cyan); font-size: 0.8rem; }
+  .pc-status { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-muted); }
+  .btn-control {
+    background: var(--surface); border: 1px solid var(--border); color: #fff;
+    padding: 10px; border-radius: 10px; font-weight: 600; cursor: pointer;
+  }
+  .btn-control:hover { border-color: var(--accent); }
+
+  .fab {
+    position: fixed; bottom: 28px; right: 24px; width: 56px; height: 56px;
+    border-radius: 28px; background: var(--accent); color: #fff; font-size: 28px;
+    border: none; box-shadow: 0 8px 25px var(--accent-glow); cursor: pointer;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+    display: none; justify-content: center; align-items: center; padding: 24px; z-index: 1000;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--card); width: 100%; max-width: 360px; padding: 28px;
+    border-radius: 20px; border: 1px solid var(--border); position: relative;
+  }
+  .modal h2 { font-size: 1.2rem; margin: 0 0 20px; }
+  .modal-close { position: absolute; top: 14px; right: 14px; background: none; border: none; color: #fff; font-size: 22px; }
+
+  /* QR Scanner */
+  .qr-preview { position: relative; border-radius: 14px; overflow: hidden; margin-bottom: 10px; background: #000; }
+  .qr-preview video { width: 100%; display: block; }
+  .qr-frame {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 150px; height: 150px; border: 3px solid var(--accent); border-radius: 14px;
+    box-shadow: 0 0 0 2000px rgba(0,0,0,0.45);
+  }
+  .btn-stop { width: 100%; background: none; border: none; color: var(--text-muted); padding: 8px; font-size: 0.85rem; }
+  .qr-status { text-align: center; font-size: 0.85rem; padding: 6px; }
+
+  .divider { display: flex; align-items: center; gap: 10px; margin: 18px 0; color: var(--text-muted); font-size: 0.8rem; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+</style>
+
+<script>
+  import { supabase } from '../../components/supabase.js';
+
+  let userId = '';
+  let userEmail = '';
+
+  // ── Auth check ──
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) { window.location.href = '/app'; }
+  else {
+    userId = session.user.id;
+    userEmail = session.user.email || '';
+    document.getElementById('user-email')!.textContent = userEmail;
+  }
+
+  // ── Auto-connect from QR ──
+  const pendingCode = sessionStorage.getItem('pending_code');
+  if (pendingCode) {
+    sessionStorage.removeItem('pending_code');
+    await linkPC(pendingCode);
+  }
+
+  // ── Load PCs ──
+  async function loadPCs() {
+    const listEl = document.getElementById('pc-list')!;
+    const { data: rooms } = await supabase
+      .from('rooms').select('*').eq('user_id', userId).order('last_seen', { ascending: false });
+
+    if (!rooms || rooms.length === 0) {
+      listEl.innerHTML = '<div class="loading">No hay PCs conectados. Pulsa + para agregar.</div>';
+      return;
+    }
+
+    listEl.innerHTML = rooms.map((r: any) => {
+      const lastSeen = new Date(r.last_seen).getTime();
+      const isOnline = r.is_online && (Date.now() - lastSeen < 65000);
+      return `
+        <div class="pc-card">
+          <div class="pc-card-top">
+            <span class="pc-name">${r.pc_name || 'PC'}</span>
+            <span class="code-tag">${r.room_code}</span>
+          </div>
+          <div class="pc-status">
+            <div class="status-dot ${isOnline ? 'online' : ''}"></div>
+            <span>${isOnline ? 'En línea' : 'Desconectado'}</span>
+          </div>
+          <button class="btn-control" data-room="${r.room_code}">Controlar →</button>
+        </div>
+      `;
+    }).join('');
+
+    listEl.querySelectorAll('.btn-control').forEach(btn => {
+      btn.addEventListener('click', () => {
+        window.location.href = `/app/chat?room=${btn.getAttribute('data-room')}`;
+      });
+    });
+  }
+
+  loadPCs();
+  setInterval(loadPCs, 15000);
+
+  // ── Link PC ──
+  async function linkPC(code: string) {
+    code = code.toUpperCase().trim();
+    const errEl = document.getElementById('link-error')!;
+
+    const { data: room, error } = await supabase
+      .from('rooms').select('*').eq('room_code', code).single();
+
+    if (error || !room) {
+      errEl.textContent = 'Código no encontrado. Verifica que el agente esté activo.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    await supabase.from('rooms').update({ user_id: userId }).eq('room_code', code);
+    errEl.classList.add('hidden');
+    document.getElementById('modal-connect')!.classList.remove('active');
+    loadPCs();
+  }
+
+  // ── Modal ──
+  document.getElementById('btn-add')!.addEventListener('click', () => {
+    document.getElementById('modal-connect')!.classList.add('active');
+  });
+  document.getElementById('btn-close-modal')!.addEventListener('click', () => {
+    document.getElementById('modal-connect')!.classList.remove('active');
+    stopScanning();
+  });
+  document.getElementById('btn-link')!.addEventListener('click', () => {
+    const code = (document.getElementById('input-code') as HTMLInputElement).value;
+    if (code) linkPC(code);
+  });
+
+  // ── Logout ──
+  document.getElementById('btn-logout')!.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/app';
+  });
+
+  // ── QR Scanner ──
+  let stream: MediaStream | null = null;
+  let scanning = false;
+
+  const btnScan = document.getElementById('btn-scan')!;
+  const btnStop = document.getElementById('btn-stop-scan')!;
+  const preview = document.getElementById('qr-preview')!;
+  const video = document.getElementById('qr-video') as HTMLVideoElement;
+  const canvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
+  const statusDiv = document.getElementById('qr-status')!;
+
+  if (!navigator.mediaDevices?.getUserMedia) btnScan.style.display = 'none';
+
+  btnScan.addEventListener('click', startScanning);
+  btnStop.addEventListener('click', stopScanning);
+
+  async function startScanning() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      video.srcObject = stream;
+      preview.classList.remove('hidden');
+      btnScan.classList.add('hidden');
+      scanning = true;
+      scanFrame();
+    } catch {
+      statusDiv.textContent = '⚠ No se pudo acceder a la cámara';
+      statusDiv.classList.remove('hidden');
+    }
+  }
+
+  function stopScanning() {
+    scanning = false;
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    preview.classList.add('hidden');
+    btnScan.classList.remove('hidden');
+  }
+
+  function scanFrame() {
+    if (!scanning) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(video, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = (window as any).jsQR(imageData.data, imageData.width, imageData.height);
+
+      if (code?.data) {
+        let roomCode: string | null = null;
+        if (code.data.includes('code=')) {
+          const match = code.data.match(/code=([A-Z0-9-]+)/i);
+          if (match) roomCode = match[1].toUpperCase();
+        } else if (code.data.match(/^RAY-[A-Z0-9]{4}$/i)) {
+          roomCode = code.data.toUpperCase();
+        }
+        if (roomCode) {
+          stopScanning();
+          statusDiv.textContent = '✓ QR detectado: ' + roomCode;
+          statusDiv.style.color = '#00c853';
+          statusDiv.classList.remove('hidden');
+          linkPC(roomCode);
+          return;
+        }
+      }
+    }
+    requestAnimationFrame(scanFrame);
+  }
+</script>

@@ -1,0 +1,15 @@
+supabase
+python-dotenv
+pyautogui
+pygetwindow
+pystray
+pillow
+plyer
+pywin32
+openai
+pyinstaller
+requests
+pycaw
+comtypes
+pyperclip
+psutil

@@ -1,0 +1,10 @@
+.env
+node_modules/
+dist/
+.astro/
+build/
+*.spec
+server/build/
+server/dist/
+__pycache__/
+*.pyc
