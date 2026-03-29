@@ -158,7 +158,10 @@ import Layout from '../../layouts/Layout.astro';
             <div class="status-dot ${isOnline ? 'online' : ''}"></div>
             <span>${isOnline ? 'En línea' : 'Desconectado'}</span>
           </div>
-          <button class="btn-control" data-room="${r.room_code}">Controlar →</button>
+          <div class="pc-actions" style="display:flex; gap:10px; margin-top:12px;">
+            <button class="btn-control" data-room="${r.room_code}" style="flex:1;">Controlar →</button>
+            <button class="btn-delete" data-id="${r.id}" style="background:none; border:none; color:var(--text-muted); font-size:1.2rem; cursor:pointer;" title="Eliminar PC">🗑️</button>
+          </div>
         </div>
       `;
     }).join('');
@@ -166,6 +169,17 @@ import Layout from '../../layouts/Layout.astro';
     listEl.querySelectorAll('.btn-control').forEach(btn => {
       btn.addEventListener('click', () => {
         window.location.href = `/app/chat?room=${btn.getAttribute('data-room')}`;
+      });
+    });
+
+    listEl.querySelectorAll('.btn-delete').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        if (confirm('¿Eliminar este PC de tu lista?')) {
+          const { error } = await supabase.from('rooms').delete().eq('id', id);
+          if (error) alert('Error al eliminar: ' + error.message);
+          else loadPCs();
+        }
       });
     });
   }

@@ -17,19 +17,37 @@ import Layout from '../layouts/Layout.astro';
         <p class="label">CÓDIGO DE SALA:</p>
         <div id="room-code-display" class="room-code">------</div>
       </div>
-
       <!-- QR CODE -->
-      <canvas id="qrcode" style="margin: 20px auto; display: block;"></canvas>
-      <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+      <canvas id="qrcode" style="margin: 20px auto; display: block; border-radius: 12px;"></canvas>
+      <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" is:inline></script>
       <script is:inline>
-        document.addEventListener('DOMContentLoaded', () => {
-          const code = localStorage.getItem('room_code') || 'RAY-XXXX';
+        function generateQR() {
+          // Obtener código de la URL o localStorage
+          const urlParams = new URLSearchParams(window.location.search);
+          const code = urlParams.get('code') 
+            || localStorage.getItem('room_code') 
+            || 'RAY-XXXX';
+          
+          localStorage.setItem('room_code', code);
+          
+          const url = 'https://ray-app-wine.vercel.app/app?code=' + code;
+          
           QRCode.toCanvas(
             document.getElementById('qrcode'),
-            'https://ray-app-wine.vercel.app/app?code=' + code,
-            { width: 200, color: { dark: '#6c63ff', light: '#ffffff' } }
+            url,
+            { 
+              width: 200, 
+              margin: 2,
+              color: { dark: '#6c63ff', light: '#ffffff' } 
+            },
+            function(error) {
+              if (error) console.error('QR error:', error);
+            }
           );
-        });
+        }
+        
+        // Esperar a que qrcode.js cargue
+        window.addEventListener('load', generateQR);
       </script>
 
       <footer class="card-footer">
@@ -122,7 +140,7 @@ import Layout from '../layouts/Layout.astro';
   }
 
   function generateQR(code: string) {
-    const canvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
+    const canvas = document.getElementById('qrcode') as HTMLCanvasElement;
     if (!canvas || !code || code === '------') return;
     const url = `https://ray-app-wine.vercel.app/app?code=${code}`;
     (window as any).QRCode.toCanvas(canvas, url, {
