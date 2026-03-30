@@ -75,81 +75,85 @@ import Layout from '../layouts/Layout.astro';
 </Layout>
 
 <script is:inline>
-  window.addEventListener('load', async function() {
-    const SUPABASE_URL = 'https://wnxuozsztttajoamhmmd.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndueHVvenN6dHR0YWpvYW1obW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MDM1MzgsImV4cCI6MjA4OTk3OTUzOH0.cRIDgZfnjrVuDprxubj_PDYvlN8j62Oyvhn8KhJh4oM';
+  const SUPABASE_URL = 'https://wnxuozsztttajoamhmmd.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndueHVvenN6dHR0YWpvYW1obW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MDM1MzgsImV4cCI6MjA4OTk3OTUzOH0.cRIDgZfnjrVuDprxubj_PDYvlN8j62Oyvhn8KhJh4oM';
 
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    function genCode() {
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      return 'RAY-' + Array.from({length: 4}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  function genCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    return 'RAY-' + Array.from({length: 4}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  }
+
+  function setStatus(online) {
+    const connDot  = document.getElementById('conn-dot');
+    const connText = document.getElementById('conn-text');
+    const fDot     = document.getElementById('footer-dot');
+    const fText    = document.getElementById('footer-text');
+
+    if (online) {
+      connDot.className  = 'w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]';
+      connText.textContent = 'Conectado';
+      connText.className = 'text-sm text-green-400';
+      fDot.className     = 'w-1.5 h-1.5 rounded-full bg-green-500';
+      fText.textContent  = 'Celular conectado — puedes enviar comandos desde Ray App';
+      fText.className    = 'text-sm text-green-400';
+    } else {
+      connDot.className  = 'w-2 h-2 rounded-full bg-zinc-600';
+      connText.textContent = 'Sin conexión';
+      connText.className = 'text-sm text-zinc-500';
+      fDot.className     = 'w-1.5 h-1.5 rounded-full bg-zinc-600';
+      fText.textContent  = 'Abre Ray App en tu celular e ingresa el código';
+      fText.className    = 'text-sm text-zinc-500';
     }
+  }
 
-    function setStatus(online) {
-      const connDot  = document.getElementById('conn-dot');
-      const connText = document.getElementById('conn-text');
-      const fDot     = document.getElementById('footer-dot');
-      const fText    = document.getElementById('footer-text');
+  // Set the code IMMEDIATELY to avoid layout shift or delays
+  let roomCode = localStorage.getItem('ray_room_code') || genCode();
+  localStorage.setItem('ray_room_code', roomCode);
+  document.getElementById('room-code').textContent = roomCode;
 
-      if (online) {
-        connDot.className  = 'w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]';
-        connText.textContent = 'Conectado';
-        connText.className = 'text-sm text-green-400';
-        fDot.className     = 'w-1.5 h-1.5 rounded-full bg-green-500';
-        fText.textContent  = 'Celular conectado — puedes enviar comandos desde Ray App';
-        fText.className    = 'text-sm text-green-400';
-      } else {
-        connDot.className  = 'w-2 h-2 rounded-full bg-zinc-600';
-        connText.textContent = 'Sin conexión';
-        connText.className = 'text-sm text-zinc-500';
-        fDot.className     = 'w-1.5 h-1.5 rounded-full bg-zinc-600';
-        fText.textContent  = 'Abre Ray App en tu celular e ingresa el código';
-        fText.className    = 'text-sm text-zinc-500';
+  // Supabase connection
+  async function initConn() {
+    try {
+      const { data, error } = await sb.from('rooms').upsert({
+        room_code: roomCode,
+        pc_name: navigator.platform || 'PC',
+        is_online: false,
+        last_seen: new Date().toISOString()
+      }, { on_conflict: 'room_code' }).select().single();
+
+      if (!error && data) {
+        const ls = data.last_seen ? new Date(data.last_seen).getTime() : 0;
+        setStatus(data.is_online && (Date.now() - ls < 120000));
       }
+
+      sb.channel('room-pc').on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'rooms',
+        filter: 'room_code=eq.' + roomCode
+      }, function(p) {
+        const r = p.new;
+        const ls = r.last_seen ? new Date(r.last_seen).getTime() : 0;
+        setStatus(r.is_online && (Date.now() - ls < 120000));
+      }).subscribe();
+    } catch (err) {
+      console.error("Error setting up Supabase:", err);
     }
+  }
+  initConn();
 
-    // Generate or recover code
-    let roomCode = localStorage.getItem('ray_room_code') || genCode();
-    localStorage.setItem('ray_room_code', roomCode);
-    document.getElementById('room-code').textContent = roomCode;
-
-    // Upsert room in Supabase
-    const { data, error } = await sb.from('rooms').upsert({
-      room_code: roomCode,
-      pc_name: navigator.platform || 'PC',
-      is_online: false,
-      last_seen: new Date().toISOString()
-    }, { on_conflict: 'room_code' }).select().single();
-
-    if (!error && data) {
-      const ls = data.last_seen ? new Date(data.last_seen).getTime() : 0;
-      setStatus(data.is_online && (Date.now() - ls < 120000));
-    }
-
-    // Realtime listener
-    sb.channel('room-pc').on('postgres_changes', {
-      event: 'UPDATE', schema: 'public', table: 'rooms',
-      filter: 'room_code=eq.' + roomCode
-    }, function(p) {
-      const r = p.new;
-      const ls = r.last_seen ? new Date(r.last_seen).getTime() : 0;
-      setStatus(r.is_online && (Date.now() - ls < 120000));
-    }).subscribe();
-
-    // Buttons
-    document.getElementById('btn-copy').addEventListener('click', function() {
-      navigator.clipboard.writeText(roomCode);
-      this.textContent = '¡Copiado!';
-      setTimeout(() => this.textContent = 'Copiar código', 2000);
-    });
-    document.getElementById('room-code').addEventListener('click', function() {
-      navigator.clipboard.writeText(roomCode);
-    });
-    document.getElementById('btn-new').addEventListener('click', function() {
-      if (!confirm('¿Generar un nuevo código de sala?')) return;
-      localStorage.removeItem('ray_room_code');
-      location.reload();
-    });
+  // Buttons
+  document.getElementById('btn-copy').addEventListener('click', function() {
+    navigator.clipboard.writeText(roomCode);
+    this.textContent = '¡Copiado!';
+    setTimeout(() => this.textContent = 'Copiar código', 2000);
+  });
+  document.getElementById('room-code').addEventListener('click', function() {
+    navigator.clipboard.writeText(roomCode);
+  });
+  document.getElementById('btn-new').addEventListener('click', function() {
+    if (!confirm('¿Generar un nuevo código de sala?')) return;
+    localStorage.removeItem('ray_room_code');
+    location.reload();
   });
 </script>
