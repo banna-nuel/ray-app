@@ -1,10 +1,12 @@
-.env
 node_modules/
 dist/
 .astro/
-build/
-*.spec
-server/build/
-server/dist/
+.env
+*.log
 __pycache__/
 *.pyc
+*.pyo
+.venv/
+venv/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,186 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Ray — Dashboard PC">
+  <div class="min-h-screen flex flex-col items-center justify-center p-6">
+
+    <!-- Header -->
+    <header class="w-full max-w-[480px] flex items-center justify-between mb-8">
+      <div class="text-xl font-semibold tracking-tight">
+        Ray<span class="text-violet-500">·</span>
+      </div>
+      <div id="connection-badge" class="flex items-center gap-2 text-sm text-zinc-500">
+        <div id="conn-dot" class="w-2 h-2 rounded-full bg-zinc-600"></div>
+        <span id="conn-text">Sin conexión</span>
+      </div>
+    </header>
+
+    <!-- Main Card -->
+    <main class="w-full max-w-[480px]">
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8">
+
+        <!-- Room code label -->
+        <p class="text-[11px] font-medium tracking-[0.2em] text-zinc-500 uppercase mb-2">
+          Código de sala
+        </p>
+
+        <!-- Room code -->
+        <div id="room-code"
+          class="font-mono font-bold text-5xl text-violet-400 tracking-widest mb-6 select-all cursor-pointer"
+          title="Clic para copiar">
+          RAY-····
+        </div>
+
+        <!-- QR Code -->
+        <div class="flex justify-center mb-6">
+          <div class="bg-white rounded-xl p-3 inline-block">
+            <canvas id="qr-canvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Divider -->
+        <div class="border-t border-zinc-800 mb-6"></div>
+
+        <!-- Buttons -->
+        <div class="flex gap-3">
+          <button id="btn-copy"
+            class="flex-1 h-10 border border-zinc-700 text-zinc-300 rounded-xl text-sm font-medium hover:bg-zinc-800 transition-colors">
+            Copiar código
+          </button>
+          <button id="btn-new"
+            class="flex-1 h-10 border border-zinc-700 text-zinc-300 rounded-xl text-sm font-medium hover:bg-zinc-800 transition-colors">
+            Nuevo código
+          </button>
+        </div>
+
+        <!-- Footer status -->
+        <div id="card-footer" class="mt-6 flex items-center gap-2 text-sm text-zinc-500">
+          <div id="footer-dot" class="w-1.5 h-1.5 rounded-full bg-zinc-600"></div>
+          <span id="footer-text">Abre Ray App en tu celular e ingresa el código</span>
+        </div>
+
+      </div>
+
+      <!-- Instructions -->
+      <ol class="mt-6 text-sm text-zinc-500 space-y-2 list-none">
+        <li class="flex gap-3">
+          <span class="text-zinc-700 font-mono">1.</span>
+          Abre Ray App en tu celular
+        </li>
+        <li class="flex gap-3">
+          <span class="text-zinc-700 font-mono">2.</span>
+          Ingresa el código o escanea el QR
+        </li>
+        <li class="flex gap-3">
+          <span class="text-zinc-700 font-mono">3.</span>
+          El agente Python debe estar corriendo en este PC
+        </li>
+      </ol>
+    </main>
+
+  </div>
+</Layout>
+
+<script is:inline>
+  const SUPABASE_URL = 'https://wnxuozsztttajoamhmmd.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndueHVvenN6dHR0YWpvYW1obW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MDM1MzgsImV4cCI6MjA4OTk3OTUzOH0.cRIDgZfnjrVuDprxubj_PDYvlN8j62Oyvhn8KhJh4oM';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const MOBILE_BASE = 'https://ray-app-wine.vercel.app/mobile';
+
+  let roomCode = '';
+  let roomId = null;
+
+  // ── Helpers ────────────────────────────────────────────
+  function genCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    return 'RAY-' + Array.from({ length: 4 }, () =>
+      chars[Math.floor(Math.random() * chars.length)]
+    ).join('');
+  }
+
+  function setConnected(online) {
+    const dot = document.getElementById('conn-dot');
+    const text = document.getElementById('conn-text');
+    const fdot = document.getElementById('footer-dot');
+    const ftext = document.getElementById('footer-text');
+
+    if (online) {
+      dot.className = 'w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]';
+      text.textContent = 'Conectado';
+      text.className = 'text-sm text-green-400';
+      fdot.className = 'w-1.5 h-1.5 rounded-full bg-green-500';
+      ftext.textContent = 'Celular conectado — puedes enviar comandos desde Ray App';
+      ftext.className = 'text-sm text-green-400';
+    } else {
+      dot.className = 'w-2 h-2 rounded-full bg-zinc-600';
+      text.textContent = 'Sin conexión';
+      text.className = 'text-sm text-zinc-500';
+      fdot.className = 'w-1.5 h-1.5 rounded-full bg-zinc-600';
+      ftext.textContent = 'Abre Ray App en tu celular e ingresa el código';
+      ftext.className = 'text-sm text-zinc-500';
+    }
+  }
+
+  function renderQR(code) {
+    const url = `${MOBILE_BASE}/index.html?code=${code}`;
+    QRCode.toCanvas(document.getElementById('qr-canvas'), url, {
+      width: 176,
+      margin: 0,
+      color: { dark: '#7c3aed', light: '#ffffff' }
+    });
+  }
+
+  // ── Init ───────────────────────────────────────────────
+  async function init() {
+    // 1. Get or generate code
+    roomCode = localStorage.getItem('ray_room_code') || genCode();
+    localStorage.setItem('ray_room_code', roomCode);
+    document.getElementById('room-code').textContent = roomCode;
+    renderQR(roomCode);
+
+    // 2. Upsert room in Supabase
+    const { data, error } = await sb.from('rooms').upsert({
+      room_code: roomCode,
+      pc_name: 'PC Web',
+      is_online: false,
+      last_seen: new Date().toISOString()
+    }, { on_conflict: 'room_code' }).select().single();
+
+    if (!error && data) {
+      roomId = data.id;
+      setConnected(data.is_online && (Date.now() - new Date(data.last_seen).getTime() < 120000));
+    }
+
+    // 3. Subscribe Realtime
+    sb.channel('room-watch').on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'rooms',
+      filter: `room_code=eq.${roomCode}`
+    }, payload => {
+      const r = payload.new;
+      const online = r.is_online && (Date.now() - new Date(r.last_seen).getTime() < 120000);
+      setConnected(online);
+    }).subscribe();
+  }
+
+  // ── Buttons ────────────────────────────────────────────
+  document.getElementById('btn-copy').addEventListener('click', () => {
+    navigator.clipboard.writeText(roomCode);
+    const btn = document.getElementById('btn-copy');
+    btn.textContent = '¡Copiado!';
+    setTimeout(() => btn.textContent = 'Copiar código', 2000);
+  });
+
+  document.getElementById('room-code').addEventListener('click', () => {
+    navigator.clipboard.writeText(roomCode);
+  });
+
+  document.getElementById('btn-new').addEventListener('click', async () => {
+    if (!confirm('¿Generar un nuevo código de sala?')) return;
+    localStorage.removeItem('ray_room_code');
+    location.reload();
+  });
+
+  init();
+</script>

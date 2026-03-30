@@ -1,5 +1,7 @@
 {
-  "buildCommand": "cd ray-app-web && npm install && npm run build",
-  "outputDirectory": "ray-app-web/dist",
-  "framework": "astro"
+  "buildCommand": "cd web && npm install && npm run build",
+  "outputDirectory": "web/dist",
+  "rewrites": [
+    { "source": "/mobile/:path*", "destination": "/mobile/:path*" }
+  ]
 }

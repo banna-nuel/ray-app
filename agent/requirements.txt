@@ -1,0 +1,9 @@
+groq
+supabase
+python-dotenv
+pyautogui
+pygetwindow
+pycaw
+comtypes
+psutil
+pyperclip
