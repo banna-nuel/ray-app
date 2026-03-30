@@ -20,35 +20,7 @@ import Layout from '../layouts/Layout.astro';
       <!-- QR CODE -->
       <canvas id="qrcode" style="margin: 20px auto; display: block; border-radius: 12px;"></canvas>
       <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" is:inline></script>
-      <script is:inline>
-        function generateQR() {
-          // Obtener código de la URL o localStorage
-          const urlParams = new URLSearchParams(window.location.search);
-          const code = urlParams.get('code') 
-            || localStorage.getItem('room_code') 
-            || 'RAY-XXXX';
-          
-          localStorage.setItem('room_code', code);
-          
-          const url = 'https://ray-app-wine.vercel.app/app?code=' + code;
-          
-          QRCode.toCanvas(
-            document.getElementById('qrcode'),
-            url,
-            { 
-              width: 200, 
-              margin: 2,
-              color: { dark: '#6c63ff', light: '#ffffff' } 
-            },
-            function(error) {
-              if (error) console.error('QR error:', error);
-            }
-          );
-        }
-        
-        // Esperar a que qrcode.js cargue
-        window.addEventListener('load', generateQR);
-      </script>
+
 
       <footer class="card-footer">
         <div class="agent-row">
