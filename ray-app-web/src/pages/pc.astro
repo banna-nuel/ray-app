@@ -1,0 +1,218 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Conectar PC">
+  <div class="pc-container">
+    <div class="card pc-card">
+      <header class="card-header">
+        <h1 class="logo" style="margin:0; font-size:1.8rem; letter-spacing: -1px;">Ray<span class="dot" style="color:var(--accent);">.</span></h1>
+        <div class="live-indicator">
+          <div id="status-dot" class="status-dot"></div>
+          <span id="status-text">Esperando agente...</span>
+        </div>
+      </header>
+
+      <div class="code-section">
+        <p class="label">CÓDIGO DE SALA:</p>
+        <div id="room-code-display" class="room-code">------</div>
+      </div>
+      <!-- QR CODE -->
+      <canvas id="qrcode" style="margin: 20px auto; display: block; border-radius: 12px;"></canvas>
+      <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" is:inline></script>
+      <script is:inline>
+        function generateQR() {
+          // Obtener código de la URL o localStorage
+          const urlParams = new URLSearchParams(window.location.search);
+          const code = urlParams.get('code') 
+            || localStorage.getItem('room_code') 
+            || 'RAY-XXXX';
+          
+          localStorage.setItem('room_code', code);
+          
+          const url = 'https://ray-app-wine.vercel.app/app?code=' + code;
+          
+          QRCode.toCanvas(
+            document.getElementById('qrcode'),
+            url,
+            { 
+              width: 200, 
+              margin: 2,
+              color: { dark: '#6c63ff', light: '#ffffff' } 
+            },
+            function(error) {
+              if (error) console.error('QR error:', error);
+            }
+          );
+        }
+        
+        // Esperar a que qrcode.js cargue
+        window.addEventListener('load', generateQR);
+      </script>
+
+      <footer class="card-footer">
+        <div class="agent-row">
+          <span class="status-dot" id="agent-dot"></span>
+          <span id="agent-status">Esperando agente...</span>
+        </div>
+        <button id="btn-regenerate" class="btn-ghost">Regenerar código</button>
+      </footer>
+    </div>
+
+    <div class="instructions">
+      <p><strong>Pasos para conectar:</strong></p>
+      <ol>
+        <li>Ejecuta <b>RayAgent.exe</b> en este PC</li>
+        <li>Abre <b>Ray App</b> en tu móvil</li>
+        <li>Escanea el QR o ingresa el código</li>
+      </ol>
+    </div>
+  </div>
+</Layout>
+
+
+
+<style>
+  .pc-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a0f 100%);
+  }
+  .pc-card {
+    width: 100%; max-width: 420px; padding: 40px; text-align: center;
+    background: rgba(22,22,31,0.85); backdrop-filter: blur(16px);
+    box-shadow: 0 30px 60px rgba(0,0,0,0.5); border-radius: 24px;
+  }
+  .card-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;
+  }
+  .live-indicator { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-muted); }
+  .label {
+    font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 3px; margin-bottom: 8px;
+  }
+  .room-code {
+    font-size: 3.5rem; font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+    color: var(--accent); letter-spacing: 6px; margin: 8px 0;
+    text-shadow: 0 0 25px var(--accent-glow);
+  }
+  .qr-section { margin: 28px 0 0; }
+  .qr-section canvas {
+    border-radius: 16px; padding: 14px; background: #fff;
+    box-shadow: 0 8px 32px rgba(108,99,255,0.15);
+  }
+  .qr-hint { font-size: 0.8rem; color: var(--text-muted); margin-top: 12px; }
+  .card-footer {
+    border-top: 1px solid var(--border); padding-top: 24px; margin-top: 24px;
+  }
+  .agent-row {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;
+  }
+  .btn-ghost {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 0.8rem; text-decoration: underline; cursor: pointer; opacity: 0.6;
+  }
+  .btn-ghost:hover { opacity: 1; color: var(--accent); }
+  .instructions {
+    margin-top: 40px; color: var(--text-muted); font-size: 0.9rem;
+    text-align: left; max-width: 420px;
+  }
+  .instructions ol { padding-left: 20px; margin-top: 12px; }
+  .instructions li { margin-bottom: 8px; }
+  .instructions b { color: var(--accent); }
+</style>
+
+<script>
+  import { supabase } from '../components/supabase.js';
+
+  let roomCode = '';
+
+  function generateCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let result = 'RAY-';
+    for (let i = 0; i < 4; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+    return result;
+  }
+
+  function generateQR(code: string) {
+    const canvas = document.getElementById('qrcode') as HTMLCanvasElement;
+    if (!canvas || !code || code === '------') return;
+    const url = `https://ray-app-wine.vercel.app/app?code=${code}`;
+    (window as any).QRCode.toCanvas(canvas, url, {
+      width: 200, margin: 2,
+      color: { dark: '#6c63ff', light: '#ffffff' }
+    });
+  }
+
+  async function initPC() {
+    const params = new URLSearchParams(window.location.search);
+    const urlCode = params.get('code');
+
+    if (urlCode && urlCode.startsWith('RAY-')) {
+      roomCode = urlCode.toUpperCase();
+      localStorage.setItem('room_code', roomCode);
+      window.history.replaceState({}, document.title, '/pc');
+    } else {
+      roomCode = localStorage.getItem('room_code') || '';
+    }
+
+    if (!roomCode) {
+      roomCode = generateCode();
+      localStorage.setItem('room_code', roomCode);
+    }
+
+    document.getElementById('room-code-display')!.textContent = roomCode;
+    generateQR(roomCode);
+    syncRoom();
+    setInterval(syncRoom, 15000);
+    setupRealtime();
+  }
+
+  async function syncRoom() {
+    if (!roomCode) return;
+    try {
+      const { data, error } = await supabase.from('rooms').upsert({
+        room_code: roomCode, pc_name: 'PC Web', last_seen: new Date().toISOString()
+      }, { on_conflict: 'room_code' }).select().single();
+      if (!error && data) updateUI(data);
+    } catch (e) { console.error('Heartbeat:', e); }
+  }
+
+  function setupRealtime() {
+    supabase.channel(`room-pc-${roomCode}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'rooms',
+        filter: `room_code=eq.${roomCode}`
+      }, (payload: any) => updateUI(payload.new))
+      .subscribe();
+  }
+
+  function updateUI(room: any) {
+    const lastSeen = new Date(room.last_seen).getTime();
+    const isOnline = room.is_online && (Date.now() - lastSeen < 65000);
+
+    const dot = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    const aDot = document.getElementById('agent-dot');
+    const aStatus = document.getElementById('agent-status');
+
+    if (dot) dot.className = `status-dot ${isOnline ? 'online' : ''}`;
+    if (text) text.textContent = isOnline ? 'En línea' : 'Esperando agente...';
+    if (aDot) aDot.className = `status-dot ${isOnline ? 'online' : ''}`;
+    if (aStatus) aStatus.textContent = isOnline ? '⚡ Agente conectado' : 'Esperando agente...';
+  }
+
+  document.getElementById('btn-regenerate')?.addEventListener('click', () => {
+    if (confirm('¿Generar un nuevo código?')) {
+      localStorage.removeItem('room_code');
+      window.location.reload();
+    }
+  });
+
+  initPC();
+</script>

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -34,7 +35,7 @@ def upsert_room(room_code, pc_name=None, is_online=True):
     data = {
         "room_code": room_code,
         "is_online": is_online,
-        "last_seen": "now()" if is_online else None
+        "last_seen": datetime.now(timezone.utc).isoformat() if is_online else None
     }
     if pc_name:
         data["pc_name"] = pc_name

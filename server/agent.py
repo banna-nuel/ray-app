@@ -123,8 +123,8 @@ def main():
         sys.exit(1)
 
     # Open Dashboard in Browser automatically
-    # El usuario pidió que la URL sea https://ray-app-wine.vercel.app?code={room_code}
-    web_url = f"https://ray-app-wine.vercel.app?code={room_code}"
+    # El usuario pidió que la URL sea la página 2 (código de sala)
+    web_url = f"https://ray-app-wine.vercel.app/pc?code={room_code}"
     print(f"  🌐 Abriendo panel web: {web_url}")
     try:
         import webbrowser

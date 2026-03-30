@@ -40,7 +40,10 @@ import Layout from '../../layouts/Layout.astro';
 
         <div class="divider"><span>o ingresa manualmente</span></div>
 
-        <input type="text" id="input-code" placeholder="RAY-XXXX" maxlength="8">
+        <div class="code-input-wrapper">
+          <span class="prefix">RAY-</span>
+          <input type="text" id="input-code" placeholder="XXXX" maxlength="4" autocomplete="off">
+        </div>
         <div id="link-error" class="error-text hidden"></div>
         <button id="btn-link" class="btn-primary" style="margin-top:12px;">Conectar</button>
       </div>
@@ -96,6 +99,12 @@ import Layout from '../../layouts/Layout.astro';
   }
   .modal h2 { font-size: 1.2rem; margin: 0 0 20px; }
   .modal-close { position: absolute; top: 14px; right: 14px; background: none; border: none; color: #fff; font-size: 22px; }
+
+  /* Input manual */
+  .code-input-wrapper { display: flex; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .code-input-wrapper .prefix { padding: 12px 0 12px 16px; color: var(--text-muted); font-weight: 600; font-family: monospace; font-size: 1.1rem; }
+  .code-input-wrapper input { border: none; background: transparent; padding: 12px 16px 12px 4px; flex: 1; outline: none; text-transform: uppercase; font-size: 1.1rem; color: #fff; font-family: monospace; }
+  .code-input-wrapper:focus-within { border-color: var(--accent); box-shadow: 0 0 8px rgba(108,99,255,0.2); }
 
   /* QR Scanner */
   .qr-preview { position: relative; border-radius: 14px; overflow: hidden; margin-bottom: 10px; background: #000; }
@@ -216,8 +225,8 @@ import Layout from '../../layouts/Layout.astro';
     stopScanning();
   });
   document.getElementById('btn-link')!.addEventListener('click', () => {
-    const code = (document.getElementById('input-code') as HTMLInputElement).value;
-    if (code) linkPC(code);
+    const rawVal = (document.getElementById('input-code') as HTMLInputElement).value.trim();
+    if (rawVal) linkPC("RAY-" + rawVal);
   });
 
   // ── Logout ──
