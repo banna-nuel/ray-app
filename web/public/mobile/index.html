@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Ray — Iniciar sesión</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+    <div style="width:100%;max-width:390px;">
+
+      <!-- Logo -->
+      <div style="text-align:center;margin-bottom:40px;">
+        <p class="logo" style="font-size:28px;">Ray<span class="logo-dot">·</span></p>
+        <p style="color:var(--muted);font-size:14px;margin-top:6px;">Controla tu PC con IA</p>
+      </div>
+
+      <!-- Card -->
+      <div class="card">
+        <!-- Tabs -->
+        <div class="tabs">
+          <button class="tab active" id="tab-login" onclick="showTab('login')">Entrar</button>
+          <button class="tab" id="tab-register" onclick="showTab('register')">Registrarse</button>
+        </div>
+
+        <!-- Login form -->
+        <form id="form-login" onsubmit="handleLogin(event)">
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <input class="input" type="email" id="login-email" placeholder="Correo electrónico" required autocomplete="email" />
+            <input class="input" type="password" id="login-password" placeholder="Contraseña" required autocomplete="current-password" />
+            <button class="btn btn-primary" type="submit" id="btn-login">Iniciar sesión</button>
+          </div>
+          <p class="error-msg" id="login-error"></p>
+        </form>
+
+        <!-- Register form -->
+        <form id="form-register" class="hidden" onsubmit="handleRegister(event)">
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <input class="input" type="email" id="reg-email" placeholder="Correo electrónico" required autocomplete="email" />
+            <input class="input" type="password" id="reg-password" placeholder="Contraseña" required autocomplete="new-password" minlength="6" />
+            <input class="input" type="password" id="reg-confirm" placeholder="Confirmar contraseña" required autocomplete="new-password" />
+            <button class="btn btn-primary" type="submit" id="btn-register">Crear cuenta</button>
+          </div>
+          <p class="error-msg" id="register-error"></p>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // Redirigir si ya hay sesión
+    document.addEventListener('DOMContentLoaded', async () => {
+      const session = await RayApp.getSession();
+      if (session) window.location.href = '/mobile/dashboard.html';
+      lucide.createIcons();
+    });
+
+    function showTab(tab) {
+      document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+      document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+      document.getElementById('form-login').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('form-register').classList.toggle('hidden', tab !== 'register');
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-login');
+      const errEl = document.getElementById('login-error');
+      btn.textContent = 'Entrando...';
+      btn.disabled = true;
+      errEl.textContent = '';
+
+      const sb = await RayApp.getSB();
+      const { error } = await sb.auth.signInWithPassword({
+        email: document.getElementById('login-email').value,
+        password: document.getElementById('login-password').value,
+      });
+
+      if (error) {
+        errEl.textContent = error.message === 'Invalid login credentials'
+          ? 'Correo o contraseña incorrectos'
+          : error.message;
+        btn.textContent = 'Iniciar sesión';
+        btn.disabled = false;
+      } else {
+        window.location.href = '/mobile/dashboard.html';
+      }
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-register');
+      const errEl = document.getElementById('register-error');
+      const pw = document.getElementById('reg-password').value;
+      const cpw = document.getElementById('reg-confirm').value;
+
+      if (pw !== cpw) {
+        errEl.textContent = 'Las contraseñas no coinciden';
+        return;
+      }
+
+      btn.textContent = 'Creando cuenta...';
+      btn.disabled = true;
+      errEl.textContent = '';
+
+      const sb = await RayApp.getSB();
+      const { error } = await sb.auth.signUp({
+        email: document.getElementById('reg-email').value,
+        password: pw,
+      });
+
+      if (error) {
+        errEl.textContent = error.message;
+        btn.textContent = 'Crear cuenta';
+        btn.disabled = false;
+      } else {
+        errEl.style.color = 'var(--green)';
+        errEl.textContent = 'Cuenta creada. Revisa tu correo para confirmar.';
+        btn.textContent = 'Crear cuenta';
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

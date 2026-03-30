@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Ray — Chat</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="app.js" defer></script>
+  <style>
+    body { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+
+    #chat-header {
+      flex-shrink: 0;
+      height: 56px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 12px;
+    }
+
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #chat-footer {
+      flex-shrink: 0;
+      height: 64px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px;
+    }
+
+    #msg-input {
+      flex: 1;
+      height: 40px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 0 14px;
+      font-size: 15px;
+      color: var(--text);
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #msg-input:focus { border-color: var(--accent); }
+
+    #btn-mic, #btn-send {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      border: none;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+      flex-shrink: 0;
+    }
+    #btn-mic { background: transparent; }
+    #btn-mic.recording { background: rgba(239,68,68,0.15); }
+    #btn-mic.recording i { color: var(--red) !important; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    #btn-send { background: var(--accent); }
+    #btn-send:hover { background: var(--accent-hover); }
+    #btn-send:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .typing-wrap {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      align-self: flex-start;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      border-bottom-left-radius: 4px;
+      padding: 12px 14px;
+    }
+
+    .offline-banner {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--red);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div id="chat-header">
+    <button class="btn btn-ghost" onclick="history.back()">
+      <i data-lucide="arrow-left" style="width:20px;height:20px;"></i>
+    </button>
+    <div style="flex:1;text-align:center;">
+      <p style="font-weight:600;font-size:15px;" id="pc-name">PC</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <div class="dot dot-offline" id="conn-dot" style="width:6px;height:6px;"></div>
+      <span class="text-sm text-muted" id="conn-status">—</span>
+    </div>
+  </div>
+
+  <!-- Messages -->
+  <div id="messages">
+    <div class="offline-banner hidden" id="offline-banner">
+      El agente Python no está corriendo en el PC
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div id="chat-footer">
+    <input type="text" id="msg-input" placeholder="Escribe un comando..." autocomplete="off" />
+    <button id="btn-mic">
+      <i data-lucide="mic" style="width:20px;height:20px;color:var(--muted);"></i>
+    </button>
+    <button id="btn-send" disabled>
+      <i data-lucide="send" style="width:18px;height:18px;color:#fff;"></i>
+    </button>
+  </div>
+
+  <script>
+    let session, sb, roomCode, roomId, isOnline = false;
+    let recognition = null, recording = false;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      session = await RayApp.requireAuth().catch(() => null);
+      if (!session) return;
+
+      sb = await RayApp.getSB();
+      roomCode = RayApp.getParam('room');
+      if (!roomCode) { history.back(); return; }
+
+      lucide.createIcons();
+      await initRoom();
+      loadHistory();
+      subscribeRealtime();
+      setupInput();
+      setupVoice();
+    });
+
+    // ── Room ────────────────────────────────────────────
+    async function initRoom() {
+      const { data, error } = await sb
+        .from('rooms').select('*').eq('room_code', roomCode).single();
+
+      if (error || !data) { history.back(); return; }
+      roomId = data.id;
+      document.getElementById('pc-name').textContent = data.pc_name || roomCode;
+      updateStatus(data);
+    }
+
+    function updateStatus(room) {
+      const ls = room.last_seen ? new Date(room.last_seen).getTime() : 0;
+      isOnline = room.is_online && (Date.now() - ls < 120000);
+      const dot = document.getElementById('conn-dot');
+      const txt = document.getElementById('conn-status');
+      const banner = document.getElementById('offline-banner');
+
+      dot.className = `dot ${isOnline ? 'dot-online' : 'dot-offline'}`;
+      txt.textContent = isOnline ? 'En línea' : 'Desconectado';
+      txt.style.color = isOnline ? 'var(--green)' : 'var(--muted)';
+      banner.classList.toggle('hidden', isOnline);
+    }
+
+    // ── History ─────────────────────────────────────────
+    async function loadHistory() {
+      const { data } = await sb
+        .from('commands')
+        .select('*')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: true })
+        .limit(50);
+
+      const msgs = document.getElementById('messages');
+      // keep banner
+      const banner = document.getElementById('offline-banner');
+
+      (data || []).forEach(cmd => {
+        appendBubble('user', cmd.input);
+        if (cmd.status !== 'pending' && cmd.message) {
+          appendBubble('ray', cmd.message);
+        }
+      });
+      scrollBottom();
+    }
+
+    // ── Realtime ─────────────────────────────────────────
+    function subscribeRealtime() {
+      // Room status changes
+      sb.channel('chat-room').on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'rooms',
+        filter: `id=eq.${roomId}`
+      }, p => updateStatus(p.new)).subscribe();
+
+      // Command responses
+      sb.channel('chat-cmds').on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'commands',
+        filter: `room_id=eq.${roomId}`
+      }, p => {
+        const cmd = p.new;
+        if (cmd.status === 'done' || cmd.status === 'error') {
+          removeTyping(cmd.id);
+          if (cmd.message) appendBubble('ray', cmd.message);
+          scrollBottom();
+        }
+      }).subscribe();
+    }
+
+    // ── Send ─────────────────────────────────────────────
+    async function sendMessage(text) {
+      text = text.trim();
+      if (!text || !roomId) return;
+
+      document.getElementById('msg-input').value = '';
+      document.getElementById('btn-send').disabled = true;
+
+      appendBubble('user', text);
+      scrollBottom();
+
+      const { data: cmd } = await sb.from('commands').insert({
+        room_id: roomId,
+        input: text,
+        status: 'pending'
+      }).select().single();
+
+      if (cmd) showTyping(cmd.id);
+
+      // Timeout 30s
+      setTimeout(async () => {
+        if (cmd) {
+          removeTyping(cmd.id);
+          const { data } = await sb.from('commands').select('status').eq('id', cmd.id).single();
+          if (data && data.status === 'pending') {
+            await sb.from('commands').update({ status: 'error', message: 'Sin respuesta del agente (30s).' }).eq('id', cmd.id);
+            appendBubble('ray', 'Sin respuesta del agente. ¿Está corriendo el Python?');
+            scrollBottom();
+          }
+        }
+      }, 30000);
+    }
+
+    // ── UI helpers ───────────────────────────────────────
+    function appendBubble(role, text) {
+      const msgs = document.getElementById('messages');
+      const wrap = document.createElement('div');
+      wrap.style.display = 'flex';
+      wrap.style.flexDirection = 'column';
+      wrap.style.alignItems = role === 'user' ? 'flex-end' : 'flex-start';
+
+      if (role === 'ray') {
+        const lbl = document.createElement('p');
+        lbl.className = 'bubble-label';
+        lbl.textContent = 'Ray';
+        wrap.appendChild(lbl);
+      }
+
+      const bubble = document.createElement('div');
+      bubble.className = `bubble ${role === 'user' ? 'bubble-user' : 'bubble-ray'}`;
+      bubble.textContent = text;
+      wrap.appendChild(bubble);
+      msgs.appendChild(wrap);
+    }
+
+    function showTyping(cmdId) {
+      const msgs = document.getElementById('messages');
+      const wrap = document.createElement('div');
+      wrap.id = `typing-${cmdId}`;
+      wrap.style.display = 'flex';
+      wrap.style.flexDirection = 'column';
+      wrap.style.alignItems = 'flex-start';
+
+      const lbl = document.createElement('p');
+      lbl.className = 'bubble-label';
+      lbl.textContent = 'Ray';
+      wrap.appendChild(lbl);
+
+      const tw = document.createElement('div');
+      tw.className = 'typing-wrap';
+      tw.innerHTML = `<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>`;
+      wrap.appendChild(tw);
+      msgs.appendChild(wrap);
+      scrollBottom();
+    }
+
+    function removeTyping(cmdId) {
+      document.getElementById(`typing-${cmdId}`)?.remove();
+    }
+
+    function scrollBottom() {
+      const msgs = document.getElementById('messages');
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    // ── Input setup ──────────────────────────────────────
+    function setupInput() {
+      const input = document.getElementById('msg-input');
+      const sendBtn = document.getElementById('btn-send');
+
+      input.addEventListener('input', () => {
+        sendBtn.disabled = !input.value.trim();
+      });
+
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          if (!sendBtn.disabled) sendMessage(input.value);
+        }
+      });
+
+      sendBtn.addEventListener('click', () => sendMessage(input.value));
+    }
+
+    // ── Voice ────────────────────────────────────────────
+    function setupVoice() {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) { document.getElementById('btn-mic').style.display = 'none'; return; }
+
+      recognition = new SpeechRec();
+      recognition.lang = 'es-ES';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onresult = e => {
+        const text = e.results[0][0].transcript;
+        document.getElementById('msg-input').value = text;
+        document.getElementById('btn-send').disabled = false;
+        sendMessage(text);
+      };
+
+      recognition.onend = () => {
+        recording = false;
+        document.getElementById('btn-mic').classList.remove('recording');
+      };
+
+      document.getElementById('btn-mic').addEventListener('click', () => {
+        if (recording) {
+          recognition.stop();
+        } else {
+          recognition.start();
+          recording = true;
+          document.getElementById('btn-mic').classList.add('recording');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

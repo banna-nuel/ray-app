@@ -131,10 +131,11 @@ def execute(action: str, params: dict) -> dict:
             return {"success": True}
 
         elif action == "get_system_info":
+            disk_path = "C:\\"
             info = {
                 "cpu": f"{psutil.cpu_percent(interval=0.5):.1f}%",
                 "ram": f"{psutil.virtual_memory().percent:.1f}%",
-                "disk": f"{psutil.disk_usage('C:\\').percent:.1f}%"
+                "disk": f"{psutil.disk_usage(disk_path).percent:.1f}%"
             }
             return {"success": True, "data": info}
 

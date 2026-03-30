@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Ray — Mis PCs</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body style="height:100vh;display:flex;flex-direction:column;overflow:hidden;">
+
+  <!-- Header -->
+  <header style="flex-shrink:0;border-bottom:1px solid var(--border);">
+    <div class="container" style="height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;max-width:390px;margin:0 auto;">
+      <p class="logo">Ray<span class="logo-dot">·</span></p>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <p id="user-email" class="text-sm text-muted truncate" style="max-width:180px;"></p>
+        <button class="btn btn-ghost" onclick="RayApp.signOut()" title="Cerrar sesión">
+          <i data-lucide="log-out" style="width:18px;height:18px;color:var(--muted);"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Content -->
+  <main style="flex:1;overflow-y:auto;padding:16px 16px 100px;">
+    <div style="max-width:390px;margin:0 auto;">
+      <h1 style="font-size:18px;font-weight:600;margin-bottom:16px;">Mis PCs</h1>
+      <div id="pc-list">
+        <p class="text-muted text-sm text-center" style="padding:40px 0;">Cargando...</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- FAB -->
+  <div style="position:fixed;bottom:24px;left:0;right:0;padding:0 16px;">
+    <div style="max-width:390px;margin:0 auto;">
+      <button class="btn btn-primary" onclick="openModal()">
+        Conectar PC
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="overlay" id="modal">
+    <div class="modal">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <h2 style="font-size:17px;font-weight:600;">Conectar PC</h2>
+        <button class="btn btn-ghost" onclick="closeModal()">
+          <i data-lucide="x" style="width:20px;height:20px;"></i>
+        </button>
+      </div>
+
+      <p class="text-sm text-muted" style="margin-bottom:12px;">
+        Abre la web de Ray en tu PC y escribe el código que aparece.
+      </p>
+
+      <input class="input" id="code-input" placeholder="RAY-XXXX"
+        style="text-transform:uppercase;font-family:'Geist Mono',monospace;letter-spacing:0.15em;font-size:18px;text-align:center;margin-bottom:12px;"
+        maxlength="8" />
+
+      <p class="error-msg" id="modal-error"></p>
+
+      <button class="btn btn-primary" id="btn-link" onclick="linkPC()" style="margin-top:4px;">
+        Conectar
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let session = null;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      session = await RayApp.requireAuth().catch(() => null);
+      if (!session) return;
+      document.getElementById('user-email').textContent = session.user.email;
+      lucide.createIcons();
+      loadPCs();
+
+      // Auto-link if URL has ?code=
+      const code = RayApp.getParam('code');
+      if (code) {
+        document.getElementById('code-input').value = code;
+        openModal();
+      }
+    });
+
+    async function loadPCs() {
+      const sb = await RayApp.getSB();
+      const listEl = document.getElementById('pc-list');
+
+      const { data: rooms } = await sb
+        .from('rooms').select('*').eq('user_id', session.user.id)
+        .order('last_seen', { ascending: false });
+
+      if (!rooms || rooms.length === 0) {
+        listEl.innerHTML = `<p class="text-muted text-sm text-center" style="padding:40px 0;">No tienes PCs conectados.<br>Pulsa "Conectar PC" para agregar uno.</p>`;
+        return;
+      }
+
+      listEl.innerHTML = rooms.map(r => {
+        const ls = r.last_seen ? new Date(r.last_seen).getTime() : 0;
+        const online = r.is_online && (Date.now() - ls < 120000);
+        return `
+          <div class="card" style="margin-bottom:12px;">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
+              <div>
+                <p style="font-weight:600;font-size:16px;">${r.pc_name || 'PC'}</p>
+                <p class="font-mono text-muted" style="font-size:13px;margin-top:2px;">${r.room_code}</p>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+                <div class="dot ${online ? 'dot-online' : 'dot-offline'}" style="width:6px;height:6px;"></div>
+                <span style="font-size:13px;color:${online ? 'var(--green)' : 'var(--muted)'};">${online ? 'En línea' : 'Desconectado'}</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-primary" style="flex:1;height:38px;font-size:14px;"
+                onclick="window.location.href='chat.html?room=${r.room_code}'">
+                Controlar
+              </button>
+              <button class="btn btn-outline" style="height:38px;font-size:13px;color:var(--red);border-color:var(--border);"
+                onclick="removePC('${r.id}')">
+                Desconectar
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function removePC(id) {
+      if (!confirm('¿Desconectar este PC?')) return;
+      const sb = await RayApp.getSB();
+      await sb.from('rooms').delete().eq('id', id);
+      loadPCs();
+    }
+
+    function openModal() {
+      document.getElementById('modal').classList.add('open');
+      document.getElementById('modal-error').textContent = '';
+      setTimeout(() => document.getElementById('code-input').focus(), 300);
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('open');
+    }
+
+    async function linkPC() {
+      const raw = document.getElementById('code-input').value.trim().toUpperCase();
+      const errEl = document.getElementById('modal-error');
+      errEl.textContent = '';
+
+      // Accept with or without RAY- prefix
+      const code = raw.startsWith('RAY-') ? raw : ('RAY-' + raw);
+
+      if (!code.match(/^RAY-[A-Z0-9]{4}$/)) {
+        errEl.textContent = 'Ingresa un código válido (ej: RAY-4FA9)';
+        return;
+      }
+
+      const btn = document.getElementById('btn-link');
+      btn.textContent = 'Conectando...';
+      btn.disabled = true;
+
+      const sb = await RayApp.getSB();
+      const { data: room, error } = await sb
+        .from('rooms').select('*').eq('room_code', code).single();
+
+      if (error || !room) {
+        errEl.textContent = 'Código no encontrado. ¿Tienes la web abierta en el PC?';
+        btn.textContent = 'Conectar';
+        btn.disabled = false;
+        return;
+      }
+
+      await sb.from('rooms').update({ user_id: session.user.id }).eq('id', room.id);
+
+      btn.textContent = 'Conectar';
+      btn.disabled = false;
+      closeModal();
+      window.location.href = 'chat.html?room=' + code;
+    }
+
+    // Enter key in input
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('code-input')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') linkPC();
+      });
+    });
+  </script>
+</body>
+</html>
