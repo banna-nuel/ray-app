@@ -12,33 +12,64 @@ from interpreter import interpret
 from executor import execute
 
 
-def generate_room_code() -> str:
-    chars = string.ascii_uppercase + string.digits
-    return "RAY-" + "".join(random.choices(chars, k=4))
-
-
-def get_or_create_code() -> str:
-    """Read from .env, or generate and persist a new one."""
-    code = os.getenv("ROOM_CODE", "").strip()
-    if code:
-        return code
-
-    code = generate_room_code()
-    env_path = os.path.join(os.path.dirname(__file__), ".env")
-    with open(env_path, "a") as f:
-        f.write(f"\nROOM_CODE={code}\n")
-    os.environ["ROOM_CODE"] = code
-    return code
+def get_room_code() -> str:
+    """Solicita el código al usuario interactivamente y lo guarda en .env."""
+    saved_code = os.getenv("ROOM_CODE", "").strip()
+    
+    print("=" * 50)
+    print("  Ray Agent - Inicio")
+    print("=" * 50)
+    
+    while True:
+        prompt = "\nIngresa el código que ves en la web"
+        if saved_code:
+            prompt += f" [Presiona Enter para usar {saved_code}]"
+        prompt += ": "
+        
+        user_input = input(prompt).strip().upper()
+        
+        if not user_input:
+            if saved_code:
+                return saved_code
+            print("❌ Debes ingresar un código. Ejemplo: RAY-1234")
+            continue
+            
+        if not user_input.startswith("RAY-"):
+            user_input = "RAY-" + user_input
+            
+        # Update .env
+        env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+        if not os.path.exists(env_path):
+            env_path = os.path.join(os.path.dirname(__file__), ".env")
+            
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        except FileNotFoundError:
+            lines = []
+            
+        with open(env_path, "w", encoding="utf-8") as f:
+            found = False
+            for line in lines:
+                if line.startswith("ROOM_CODE="):
+                    f.write(f"ROOM_CODE={user_input}\n")
+                    found = True
+                else:
+                    f.write(line)
+            if not found:
+                f.write(f"\nROOM_CODE={user_input}\n")
+                
+        os.environ["ROOM_CODE"] = user_input
+        return user_input
 
 
 def main():
-    room_code = get_or_create_code()
+    room_code = get_room_code()
     pc_name = socket.gethostname()
 
-    print("=" * 50)
-    print("  Ray Agent")
-    print(f"  Sala  : {room_code}")
-    print(f"  PC    : {pc_name}")
+    print("\n" + "=" * 50)
+    print(f"  Sala conectada : {room_code}")
+    print(f"  PC             : {pc_name}")
     print("=" * 50)
     print()
 
