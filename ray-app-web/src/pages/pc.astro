@@ -165,8 +165,8 @@ import Layout from '../layouts/Layout.astro';
   }
 
   function updateUI(room: any) {
-    const lastSeen = new Date(room.last_seen).getTime();
-    const isOnline = room.is_online && (Date.now() - lastSeen < 65000);
+    const lastSeen = room.last_seen ? new Date(room.last_seen).getTime() : 0;
+    const isOnline = room.is_online && (Math.abs(Date.now() - lastSeen) < 300000);
 
     const dot = document.getElementById('status-dot');
     const text = document.getElementById('status-text');

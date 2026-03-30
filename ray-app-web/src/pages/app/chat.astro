@@ -116,8 +116,8 @@ import Layout from '../../layouts/Layout.astro';
     if (data) {
       roomId = data.id;
       document.getElementById('chat-pc-name')!.textContent = data.pc_name || roomCode;
-      const lastSeen = new Date(data.last_seen).getTime();
-      isOnline = data.is_online && (Date.now() - lastSeen < 65000);
+      const lastSeen = data.last_seen ? new Date(data.last_seen).getTime() : 0;
+      isOnline = data.is_online && (Math.abs(Date.now() - lastSeen) < 300000);
       document.getElementById('chat-dot')!.className = `status-dot ${isOnline ? 'online' : ''}`;
       document.getElementById('chat-status-text')!.textContent = isOnline ? 'En línea' : 'Desconectado';
       document.getElementById('offline-banner')!.classList.toggle('hidden', isOnline);

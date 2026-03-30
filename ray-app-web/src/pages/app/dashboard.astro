@@ -155,8 +155,8 @@ import Layout from '../../layouts/Layout.astro';
     }
 
     listEl.innerHTML = rooms.map((r: any) => {
-      const lastSeen = new Date(r.last_seen).getTime();
-      const isOnline = r.is_online && (Date.now() - lastSeen < 65000);
+      const lastSeen = r.last_seen ? new Date(r.last_seen).getTime() : 0;
+      const isOnline = r.is_online && (Math.abs(Date.now() - lastSeen) < 300000); // 5 min de tolerancia
       return `
         <div class="pc-card">
           <div class="pc-card-top">
