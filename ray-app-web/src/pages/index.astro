@@ -3,6 +3,14 @@ import Layout from '../layouts/Layout.astro';
 ---
 
 <Layout title="Ray App - Control remoto con IA">
+  <script is:inline>
+    // Si la URL recibe ?code= (desde el .exe), redirigir directamente a la página de sala.
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('code')) {
+      window.location.href = '/pc?code=' + urlParams.get('code');
+    }
+  </script>
+  
   <div class="landing-container">
     <header class="landing-header">
       <div class="logo">Ray<span class="dot">.</span></div>
