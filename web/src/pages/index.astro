@@ -75,21 +75,27 @@ import Layout from '../layouts/Layout.astro';
 </Layout>
 
 <script is:inline>
-  const SUPABASE_URL = 'https://wnxuozsztttajoamhmmd.supabase.co';
-  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndueHVvenN6dHR0YWpvYW1obW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MDM1MzgsImV4cCI6MjA4OTk3OTUzOH0.cRIDgZfnjrVuDprxubj_PDYvlN8j62Oyvhn8KhJh4oM';
-
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
+  // 1. Mostrar código visualmente INMEDIATO antes que nada
   function genCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     return 'RAY-' + Array.from({length: 4}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
   }
 
+  let roomCode = localStorage.getItem('ray_room_code') || genCode();
+  localStorage.setItem('ray_room_code', roomCode);
+  
+  const rcEl = document.getElementById('room-code');
+  if (rcEl) {
+    rcEl.textContent = roomCode;
+  }
+
+  // UI helpers
   function setStatus(online) {
     const connDot  = document.getElementById('conn-dot');
     const connText = document.getElementById('conn-text');
     const fDot     = document.getElementById('footer-dot');
     const fText    = document.getElementById('footer-text');
+    if (!connDot) return;
 
     if (online) {
       connDot.className  = 'w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]';
@@ -108,25 +114,31 @@ import Layout from '../layouts/Layout.astro';
     }
   }
 
-  // Set the code IMMEDIATELY to avoid layout shift or delays
-  let roomCode = localStorage.getItem('ray_room_code') || genCode();
-  localStorage.setItem('ray_room_code', roomCode);
-  document.getElementById('room-code').textContent = roomCode;
+  // 2. Inicializar Supabase sólo cuando esté disponible
+  const SUPABASE_URL = 'https://wnxuozsztttajoamhmmd.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndueHVvenN6dHR0YWpvYW1obW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MDM1MzgsImV4cCI6MjA4OTk3OTUzOH0.cRIDgZfnjrVuDprxubj_PDYvlN8j62Oyvhn8KhJh4oM';
 
-  // Supabase connection
-  async function initConn() {
+  function initConn() {
+    if (typeof supabase === 'undefined') {
+      setTimeout(initConn, 200);
+      return;
+    }
+
     try {
-      const { data, error } = await sb.from('rooms').upsert({
+      const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+      sb.from('rooms').upsert({
         room_code: roomCode,
         pc_name: navigator.platform || 'PC',
         is_online: false,
         last_seen: new Date().toISOString()
-      }, { on_conflict: 'room_code' }).select().single();
-
-      if (!error && data) {
-        const ls = data.last_seen ? new Date(data.last_seen).getTime() : 0;
-        setStatus(data.is_online && (Date.now() - ls < 120000));
-      }
+      }, { on_conflict: 'room_code' }).select().single()
+      .then(({data, error}) => {
+        if (!error && data) {
+          const ls = data.last_seen ? new Date(data.last_seen).getTime() : 0;
+          setStatus(data.is_online && (Date.now() - ls < 120000));
+        }
+      });
 
       sb.channel('room-pc').on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'rooms',
@@ -136,6 +148,7 @@ import Layout from '../layouts/Layout.astro';
         const ls = r.last_seen ? new Date(r.last_seen).getTime() : 0;
         setStatus(r.is_online && (Date.now() - ls < 120000));
       }).subscribe();
+
     } catch (err) {
       console.error("Error setting up Supabase:", err);
     }
