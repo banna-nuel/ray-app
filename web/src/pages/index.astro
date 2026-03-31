@@ -132,7 +132,7 @@ import Layout from '../layouts/Layout.astro';
         pc_name: navigator.platform || 'PC',
         is_online: false,
         last_seen: new Date().toISOString()
-      }, { on_conflict: 'room_code' }).select().single()
+      }, { onConflict: 'room_code' }).select().single()
       .then(({data, error}) => {
         if (!error && data) {
           const ls = data.last_seen ? new Date(data.last_seen).getTime() : 0;
