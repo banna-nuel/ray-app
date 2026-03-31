@@ -130,9 +130,9 @@
     }
 
     async function removePC(id) {
-      if (!confirm('¿Desconectar este PC?')) return;
+      if (!confirm('¿Desvincular este PC de tu cuenta?')) return;
       const sb = await RayApp.getSB();
-      await sb.from('rooms').delete().eq('id', id);
+      await sb.from('rooms').update({ user_id: null }).eq('id', id);
       loadPCs();
     }
 
