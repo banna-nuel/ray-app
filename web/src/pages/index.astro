@@ -135,20 +135,18 @@ import Layout from '../layouts/Layout.astro';
       }, { onConflict: 'room_code' }).select().single()
       .then(({data, error}) => {
         if (!error && data) {
-          const ls = data.last_seen ? new Date(data.last_seen).getTime() : 0;
-          setStatus(data.is_online && (Date.now() - ls < 120000));
+          setStatus(data.is_online === true || data.is_online === 'true');
         }
       });
 
       sb.channel('room-pc').on('postgres_changes', {
-        event: 'UPDATE', schema: 'public', table: 'rooms',
-        filter: 'room_code=eq.' + roomCode
+        event: 'UPDATE', schema: 'public', table: 'rooms'
       }, function(p) {
         const r = p.new;
-        const ls = r.last_seen ? new Date(r.last_seen).getTime() : 0;
-        setStatus(r.is_online && (Date.now() - ls < 120000));
+        if (r.room_code === roomCode) {
+          setStatus(r.is_online === true || r.is_online === 'true');
+        }
       }).subscribe();
-
     } catch (err) {
       console.error("Error setting up Supabase:", err);
     }

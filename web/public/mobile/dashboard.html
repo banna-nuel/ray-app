@@ -101,8 +101,7 @@
       }
 
       listEl.innerHTML = rooms.map(r => {
-        const ls = r.last_seen ? new Date(r.last_seen).getTime() : 0;
-        const online = r.is_online && (Date.now() - ls < 120000);
+        const online = r.is_online === true || r.is_online === 'true';
         return `
           <div class="card" style="margin-bottom:12px;">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
