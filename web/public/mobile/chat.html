@@ -162,8 +162,7 @@
     }
 
     function updateStatus(room) {
-      const ls = room.last_seen ? new Date(room.last_seen).getTime() : 0;
-      isOnline = room.is_online && (Date.now() - ls < 120000);
+      isOnline = room.is_online === true || room.is_online === 'true';
       const dot = document.getElementById('conn-dot');
       const txt = document.getElementById('conn-status');
       const banner = document.getElementById('offline-banner');

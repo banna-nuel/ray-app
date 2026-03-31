@@ -127,15 +127,17 @@ import Layout from '../layouts/Layout.astro';
     try {
       const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-      sb.from('rooms').upsert({
-        room_code: roomCode,
-        pc_name: navigator.platform || 'PC',
-        is_online: false,
-        last_seen: new Date().toISOString()
-      }, { onConflict: 'room_code' }).select().single()
-      .then(({data, error}) => {
-        if (!error && data) {
-          setStatus(data.is_online === true || data.is_online === 'true');
+      sb.from('rooms').select('*').eq('room_code', roomCode).single()
+      .then(({data}) => {
+        if (!data) {
+           sb.from('rooms').insert({
+             room_code: roomCode,
+             pc_name: navigator.platform || 'PC',
+             is_online: false,
+             last_seen: new Date().toISOString()
+           }).then();
+        } else {
+           setStatus(data.is_online === true || data.is_online === 'true');
         }
       });
 

@@ -114,14 +114,14 @@
                 <span style="font-size:13px;color:${online ? 'var(--green)' : 'var(--muted)'};">${online ? 'En línea' : 'Desconectado'}</span>
               </div>
             </div>
-            <div style="display:flex;gap:8px;">
+              <div style="display:flex;gap:8px;">
               <button class="btn btn-primary" style="flex:1;height:38px;font-size:14px;"
                 onclick="window.location.href='chat.html?room=${r.room_code}'">
                 Controlar
               </button>
-              <button class="btn btn-outline" style="height:38px;font-size:13px;color:var(--red);border-color:var(--border);"
+              <button class="btn btn-outline" style="height:38px;font-size:13px;color:var(--red);border-color:var(--border);display:flex;align-items:center;justify-content:center;gap:4px;"
                 onclick="removePC('${r.id}')">
-                Desconectar
+                <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Borrar
               </button>
             </div>
           </div>
