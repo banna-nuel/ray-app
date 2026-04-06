@@ -1,0 +1,40 @@
+# Environment variables
+.env
+agent/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Node
+node_modules/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cache
+__pycache__/
+*.pyc
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build
+web/dist/
+web/.astro/

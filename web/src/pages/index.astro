@@ -1,0 +1,212 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout>
+  <div class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-[480px]">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-1">
+          <span class="text-xl font-bold text-[#fafafa]">Ray</span>
+          <span class="text-[#7c3aed] text-xl">·</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <div id="status-indicator" class="w-2 h-2 rounded-full bg-red-500"></div>
+          <span id="status-text" class="text-sm text-[#71717a]">Sin conexion</span>
+        </div>
+      </div>
+
+      <!-- Main Card -->
+      <div class="bg-[#18181b] border border-[#27272a] rounded-2xl p-8">
+        <div class="text-center">
+          <!-- Label -->
+          <p class="text-xs text-[#71717a] tracking-[0.2em] uppercase mb-4">Codigo de sala</p>
+
+          <!-- Room Code -->
+          <h1 id="room-code" class="text-5xl font-mono font-bold text-[#7c3aed] mb-6">RAY-....</h1>
+
+          <!-- QR Code -->
+          <div class="flex justify-center mb-6">
+            <canvas id="qr-code" width="200" height="200" class="rounded-lg"></canvas>
+          </div>
+
+          <!-- Divider -->
+          <div class="border-t border-[#27272a] my-6"></div>
+
+          <!-- Buttons -->
+          <div class="flex gap-3">
+            <button id="btn-copy" class="flex-1 py-3 px-4 bg-transparent border border-[#27272a] rounded-xl text-sm font-medium text-[#fafafa] hover:border-[#7c3aed] hover:text-[#7c3aed] transition-all duration-150">
+              Copiar codigo
+            </button>
+            <button id="btn-new" class="flex-1 py-3 px-4 bg-[#7c3aed] border border-[#7c3aed] rounded-xl text-sm font-medium text-white hover:bg-[#6d28d9] hover:border-[#6d28d9] transition-all duration-150">
+              Nuevo codigo
+            </button>
+          </div>
+        </div>
+
+        <!-- Connection Status -->
+        <div id="mobile-status" class="mt-6 pt-6 border-t border-[#27272a]">
+          <div class="flex items-center justify-center gap-2 text-sm text-[#71717a]">
+            <i data-lucide="smartphone" class="w-4 h-4"></i>
+            <span id="mobile-status-text">Esperando conexion del celular...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Instructions -->
+      <p class="text-center text-sm text-[#71717a] mt-6 px-4">
+        Escanea el QR con tu celular o comparte el codigo para conectar
+      </p>
+    </div>
+  </div>
+
+  <script is:inline src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script type="module" is:inline>
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/+esm';
+
+    const SUPABASE_URL = 'https://wnxuozsztttajoamhmmd.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndueHVvenN6dHR0YWpvYW1obW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MDM1MzgsImV4cCI6MjA4OTk3OTUzOH0.cRIDgZfnjrVuDprxubj_PDYvlN8j62Oyvhn8KhJh4oM';
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    let roomId = null;
+    let roomCode = null;
+    let mobileConnected = false;
+
+    // Generate random room code
+    function generateRoomCode() {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let code = '';
+      for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return `RAY-${code}`;
+    }
+
+    // Get or create room code
+    async function initRoom() {
+      const storedCode = localStorage.getItem('ray_room_code');
+      const storedId = localStorage.getItem('ray_room_id');
+
+      if (storedCode && storedId) {
+        roomCode = storedCode;
+        roomId = storedId;
+      } else {
+        roomCode = generateRoomCode();
+        const { data, error } = await supabase
+          .from('rooms')
+          .insert({ room_code: roomCode, is_online: true, pc_name: navigator.platform })
+          .select('id')
+          .single();
+
+        if (error) {
+          console.error('Error creating room:', error);
+          return;
+        }
+
+        roomId = data.id;
+        localStorage.setItem('ray_room_code', roomCode);
+        localStorage.setItem('ray_room_id', roomId);
+      }
+
+      document.getElementById('room-code').textContent = roomCode;
+      generateQR();
+      subscribeToRoom();
+      updateStatus();
+    }
+
+    // Generate QR code
+    function generateQR() {
+      const canvas = document.getElementById('qr-code');
+      const baseUrl = window.location.origin + '/mobile';
+      const qrUrl = `${baseUrl}?code=${roomCode}`;
+
+      QRCode.toCanvas(canvas, qrUrl, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#7c3aed',
+          light: '#ffffff'
+        }
+      }, (error) => {
+        if (error) console.error('QR Error:', error);
+      });
+    }
+
+    // Subscribe to room changes
+    function subscribeToRoom() {
+      const subscription = supabase
+        .channel(`room:${roomId}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'rooms',
+          filter: `id=eq.${roomId}`
+        }, (payload) => {
+          const room = payload.new;
+          mobileConnected = room.is_online;
+          updateStatus();
+        })
+        .subscribe();
+    }
+
+    // Update UI status
+    function updateStatus() {
+      const indicator = document.getElementById('status-indicator');
+      const statusText = document.getElementById('status-text');
+      const mobileStatus = document.getElementById('mobile-status-text');
+
+      if (mobileConnected) {
+        indicator.className = 'w-2 h-2 rounded-full bg-green-500';
+        statusText.textContent = 'Conectado';
+        statusText.className = 'text-sm text-green-400';
+        mobileStatus.textContent = 'Celular conectado';
+      } else {
+        indicator.className = 'w-2 h-2 rounded-full bg-yellow-500';
+        statusText.textContent = 'Esperando';
+        statusText.className = 'text-sm text-yellow-400';
+        mobileStatus.textContent = 'Esperando conexion del celular...';
+      }
+    }
+
+    // Copy room code
+    document.getElementById('btn-copy').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(roomCode);
+        const btn = document.getElementById('btn-copy');
+        const originalText = btn.textContent;
+        btn.textContent = 'Copiado';
+        btn.classList.add('border-accent', 'text-accent');
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.classList.remove('border-accent', 'text-accent');
+        }, 2000);
+      } catch (err) {
+        console.error('Copy failed:', err);
+      }
+    });
+
+    // Generate new room code
+    document.getElementById('btn-new').addEventListener('click', async () => {
+      // Delete old room
+      if (roomId) {
+        await supabase.from('rooms').delete().eq('id', roomId);
+      }
+
+      // Clear storage
+      localStorage.removeItem('ray_room_code');
+      localStorage.removeItem('ray_room_id');
+
+      // Reload page
+      window.location.reload();
+    });
+
+    // Initialize
+    initRoom();
+  </script>
+</Layout>

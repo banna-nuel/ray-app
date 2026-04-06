@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ray - Conectar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="min-h-screen flex flex-col items-center justify-center p-6">
+    <!-- Logo -->
+    <div class="mb-8">
+      <div class="flex items-center gap-1 text-3xl font-bold">
+        <span>Ray</span>
+        <span class="text-accent">·</span>
+      </div>
+    </div>
+
+    <!-- Card -->
+    <div class="card w-full">
+      <p class="text-center text-text-muted text-sm mb-6">Controla tu PC desde cualquier lugar</p>
+
+      <!-- Scan QR Button -->
+      <button id="btn-scan" class="btn btn-outline w-full">
+        <i data-lucide="scan" class="w-4 h-4"></i>
+        Escanear QR
+      </button>
+
+      <div class="divider">o ingresa el codigo</div>
+
+      <!-- Code Input -->
+      <input
+        type="text"
+        id="room-input"
+        class="input font-mono text-center text-xl uppercase mb-4"
+        placeholder="RAY-XXXX"
+        maxlength="8"
+        autocomplete="off"
+      >
+
+      <!-- Connect Button -->
+      <button id="btn-connect" class="btn btn-primary w-full">
+        Conectar
+      </button>
+
+      <!-- Error message -->
+      <p id="error-msg" class="text-red-400 text-sm text-center mt-4 hidden">Codigo no encontrado</p>
+    </div>
+  </div>
+
+  <!-- Scanner Overlay -->
+  <div id="scanner-overlay" class="scanner-overlay hidden">
+    <div class="scanner-frame">
+      <video id="scanner-video" autoplay playsinline></video>
+      <canvas id="scanner-canvas" style="display: none;"></canvas>
+    </div>
+    <p class="text-text-muted mt-6 text-sm">Apunta al codigo QR de tu PC</p>
+    <button id="btn-close-scanner" class="btn btn-outline mt-8">
+      Cancelar
+    </button>
+  </div>
+
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script type="module">
+    import { getRoom, connectToRoom } from './app.js';
+
+    lucide.createIcons();
+
+    const roomInput = document.getElementById('room-input');
+    const btnConnect = document.getElementById('btn-connect');
+    const btnScan = document.getElementById('btn-scan');
+    const btnCloseScanner = document.getElementById('btn-close-scanner');
+    const scannerOverlay = document.getElementById('scanner-overlay');
+    const scannerVideo = document.getElementById('scanner-video');
+    const scannerCanvas = document.getElementById('scanner-canvas');
+    const errorMsg = document.getElementById('error-msg');
+
+    let scannerActive = false;
+    let animationFrame = null;
+
+    // Auto-uppercase input
+    roomInput.addEventListener('input', (e) => {
+      e.target.value = e.target.value.toUpperCase();
+      errorMsg.classList.add('hidden');
+    });
+
+    // Format input as RAY-XXXX
+    roomInput.addEventListener('blur', () => {
+      let value = roomInput.value.replace(/[^A-Z0-9]/g, '');
+      if (value.length > 0 && !value.startsWith('RAY-') && value.length <= 4) {
+        value = 'RAY-' + value;
+      }
+      roomInput.value = value;
+    });
+
+    // Connect handler
+    btnConnect.addEventListener('click', async () => {
+      const code = roomInput.value.trim();
+      if (!code) return;
+
+      btnConnect.disabled = true;
+      btnConnect.textContent = 'Conectando...';
+
+      const room = await getRoom(code);
+
+      if (room) {
+        await connectToRoom(code);
+        window.location.href = `chat.html?room=${code}`;
+      } else {
+        errorMsg.classList.remove('hidden');
+        btnConnect.disabled = false;
+        btnConnect.textContent = 'Conectar';
+      }
+    });
+
+    // QR Scanner
+    btnScan.addEventListener('click', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        scannerVideo.srcObject = stream;
+        scannerOverlay.classList.remove('hidden');
+        scannerActive = true;
+        scanQRCode();
+      } catch (err) {
+        console.error('Camera access denied:', err);
+        btnScan.style.display = 'none';
+      }
+    });
+
+    btnCloseScanner.addEventListener('click', stopScanner);
+
+    function stopScanner() {
+      scannerActive = false;
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+      }
+      if (scannerVideo.srcObject) {
+        scannerVideo.srcObject.getTracks().forEach(track => track.stop());
+      }
+      scannerOverlay.classList.add('hidden');
+    }
+
+    function scanQRCode() {
+      if (!scannerActive) return;
+
+      const canvas = scannerCanvas;
+      const ctx = canvas.getContext('2d');
+
+      if (scannerVideo.readyState === scannerVideo.HAVE_ENOUGH_DATA) {
+        canvas.width = scannerVideo.videoWidth;
+        canvas.height = scannerVideo.videoHeight;
+        ctx.drawImage(scannerVideo, 0, 0, canvas.width, canvas.height);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: 'dontInvert'
+        });
+
+        if (code) {
+          const url = new URL(code.data);
+          const roomCode = url.searchParams.get('code');
+
+          if (roomCode && roomCode.startsWith('RAY-')) {
+            stopScanner();
+            connectToRoom(roomCode).then(() => {
+              window.location.href = `chat.html?room=${roomCode}`;
+            });
+            return;
+          }
+        }
+      }
+
+      animationFrame = requestAnimationFrame(scanQRCode);
+    }
+
+    // Check for stored room
+    const storedRoom = localStorage.getItem('ray_current_room');
+    if (storedRoom) {
+      window.location.href = `chat.html?room=${storedRoom}`;
+    }
+  </script>
+</body>
+</html>
