@@ -29,6 +29,7 @@ import Layout from '../layouts/Layout.astro';
           <!-- QR Code -->
           <div class="flex justify-center mb-6">
             <canvas id="qr-code" width="200" height="200" class="rounded-lg"></canvas>
+            <div id="qr-error" class="hidden text-red-400 text-sm">Error al cargar QR</div>
           </div>
 
           <!-- Divider -->
@@ -63,6 +64,22 @@ import Layout from '../layouts/Layout.astro';
 
   <script is:inline src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script is:inline>
+    // Wait for QRCode library to load
+    function waitForQRCode(callback, maxAttempts = 50) {
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts++;
+        if (typeof QRCode !== 'undefined') {
+          clearInterval(interval);
+          callback(true);
+        } else if (attempts >= maxAttempts) {
+          clearInterval(interval);
+          callback(false);
+        }
+      }, 100);
+    }
+  </script>
   <script type="module" is:inline>
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/+esm';
 
@@ -115,7 +132,24 @@ import Layout from '../layouts/Layout.astro';
       }
 
       document.getElementById('room-code').textContent = roomCode;
-      generateQR();
+
+      // Wait for QRCode library before generating
+      if (typeof waitForQRCode !== 'undefined') {
+        waitForQRCode((loaded) => {
+          if (loaded) {
+            generateQR();
+          } else {
+            const canvas = document.getElementById('qr-code');
+            const errorDiv = document.getElementById('qr-error');
+            canvas.style.display = 'none';
+            errorDiv.textContent = 'Error: No se pudo cargar la librería QR. Recargá la página.';
+            errorDiv.classList.remove('hidden');
+          }
+        });
+      } else {
+        generateQR();
+      }
+
       subscribeToRoom();
       updateStatus();
     }
@@ -123,8 +157,19 @@ import Layout from '../layouts/Layout.astro';
     // Generate QR code
     function generateQR() {
       const canvas = document.getElementById('qr-code');
+      const errorDiv = document.getElementById('qr-error');
+
+      if (typeof QRCode === 'undefined') {
+        console.error('QRCode library not loaded');
+        canvas.style.display = 'none';
+        errorDiv.textContent = 'Error: No se pudo cargar la librería QR';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+
       const baseUrl = window.location.origin + '/mobile';
       const qrUrl = `${baseUrl}?code=${roomCode}`;
+      console.log('Generating QR for:', qrUrl);
 
       QRCode.toCanvas(canvas, qrUrl, {
         width: 200,
@@ -134,7 +179,16 @@ import Layout from '../layouts/Layout.astro';
           light: '#ffffff'
         }
       }, (error) => {
-        if (error) console.error('QR Error:', error);
+        if (error) {
+          console.error('QR Error:', error);
+          canvas.style.display = 'none';
+          errorDiv.textContent = 'Error al generar QR: ' + error.message;
+          errorDiv.classList.remove('hidden');
+        } else {
+          console.log('QR generated successfully');
+          canvas.style.display = 'block';
+          errorDiv.classList.add('hidden');
+        }
       });
     }
 
