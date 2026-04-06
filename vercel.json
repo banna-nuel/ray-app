@@ -5,12 +5,12 @@
       "src": "web/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "web/dist"
+        "distDir": "dist"
       }
     }
   ],
   "routes": [
-    { "src": "/mobile/(.*)", "dest": "/mobile/$1" },
-    { "src": "/(.*)", "dest": "/$1" }
+    { "src": "/mobile/(.*)", "dest": "/web/dist/mobile/$1" },
+    { "src": "/(.*)", "dest": "/web/dist/$1" }
   ]
 }
