@@ -1,12 +1,16 @@
 {
+  "version": 2,
   "builds": [
     {
       "src": "web/package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
+      "config": {
+        "distDir": "web/dist"
+      }
     }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "/web/dist/$1" }
+    { "src": "/mobile/(.*)", "dest": "/mobile/$1" },
+    { "src": "/(.*)", "dest": "/$1" }
   ]
 }
