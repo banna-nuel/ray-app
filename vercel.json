@@ -1,16 +1,10 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "web/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
-  ],
-  "routes": [
-    { "src": "/mobile/(.*)", "dest": "/web/dist/mobile/$1" },
-    { "src": "/(.*)", "dest": "/web/dist/$1" }
+  "buildCommand": "cd web && npm install && npm run build",
+  "outputDirectory": "web/dist",
+  "framework": null,
+  "rewrites": [
+    { "source": "/mobile/:path*", "destination": "/mobile/:path*" },
+    { "source": "/(.*)", "destination": "/$1" }
   ]
 }
