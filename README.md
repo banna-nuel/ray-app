@@ -90,7 +90,7 @@ python main.py
 - Abrir URLs en el navegador
 - Bloquear pantalla
 - Apagar y reiniciar PC
-- Captura de pantalla
+- Captura de pantalla y mucho mas.
 - Reproducir/pausar media, siguiente/anterior pista
 - Minimizar todas las ventanas
 - Escribir texto en el PC
