@@ -62,26 +62,10 @@ import Layout from '../layouts/Layout.astro';
     </div>
   </div>
 
-  <script is:inline src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script is:inline>
-    // Wait for QRCode library to load
-    function waitForQRCode(callback, maxAttempts = 50) {
-      let attempts = 0;
-      const interval = setInterval(() => {
-        attempts++;
-        if (typeof QRCode !== 'undefined') {
-          clearInterval(interval);
-          callback(true);
-        } else if (attempts >= maxAttempts) {
-          clearInterval(interval);
-          callback(false);
-        }
-      }, 100);
-    }
-  </script>
   <script type="module" is:inline>
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/+esm';
+    import QRCode from 'https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm';
 
     const SUPABASE_URL = 'https://wnxuozsztttajoamhmmd.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndueHVvenN6dHR0YWpvYW1obW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MDM1MzgsImV4cCI6MjA4OTk3OTUzOH0.cRIDgZfnjrVuDprxubj_PDYvlN8j62Oyvhn8KhJh4oM';
@@ -133,22 +117,8 @@ import Layout from '../layouts/Layout.astro';
 
       document.getElementById('room-code').textContent = roomCode;
 
-      // Wait for QRCode library before generating
-      if (typeof waitForQRCode !== 'undefined') {
-        waitForQRCode((loaded) => {
-          if (loaded) {
-            generateQR();
-          } else {
-            const canvas = document.getElementById('qr-code');
-            const errorDiv = document.getElementById('qr-error');
-            canvas.style.display = 'none';
-            errorDiv.textContent = 'Error: No se pudo cargar la librería QR. Recargá la página.';
-            errorDiv.classList.remove('hidden');
-          }
-        });
-      } else {
-        generateQR();
-      }
+      // Generate QR code immediately - library is imported as module
+      generateQR();
 
       subscribeToRoom();
       updateStatus();
@@ -158,14 +128,6 @@ import Layout from '../layouts/Layout.astro';
     function generateQR() {
       const canvas = document.getElementById('qr-code');
       const errorDiv = document.getElementById('qr-error');
-
-      if (typeof QRCode === 'undefined') {
-        console.error('QRCode library not loaded');
-        canvas.style.display = 'none';
-        errorDiv.textContent = 'Error: No se pudo cargar la librería QR';
-        errorDiv.classList.remove('hidden');
-        return;
-      }
 
       const baseUrl = window.location.origin + '/mobile';
       const qrUrl = `${baseUrl}?code=${roomCode}`;
