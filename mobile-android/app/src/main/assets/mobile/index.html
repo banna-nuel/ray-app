@@ -23,14 +23,6 @@
     <div class="card w-full">
       <p class="text-center text-text-muted text-sm mb-6">Controla tu PC desde cualquier lugar</p>
 
-      <!-- Scan QR Button -->
-      <button id="btn-scan" class="btn btn-outline w-full">
-        <i data-lucide="scan" class="w-4 h-4"></i>
-        Escanear QR
-      </button>
-
-      <div class="divider">o ingresa el codigo</div>
-
       <!-- Code Input -->
       <input
         type="text"
@@ -51,20 +43,7 @@
     </div>
   </div>
 
-  <!-- Scanner Overlay -->
-  <div id="scanner-overlay" class="scanner-overlay hidden" style="touch-action: none;">
-    <div class="scanner-frame">
-      <video id="scanner-video" autoplay playsinline muted></video>
-      <canvas id="scanner-canvas" style="display: none;"></canvas>
-    </div>
-    <p class="text-text-muted mt-6 text-sm">Apunta al codigo QR de tu PC</p>
-    <button id="btn-close-scanner" class="btn btn-outline mt-8" style="z-index: 1000; position: relative;">
-      Cancelar
-    </button>
-  </div>
-
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script type="module">
     import { getRoom, connectToRoom } from './app.js';
 
@@ -72,15 +51,7 @@
 
     const roomInput = document.getElementById('room-input');
     const btnConnect = document.getElementById('btn-connect');
-    const btnScan = document.getElementById('btn-scan');
-    const btnCloseScanner = document.getElementById('btn-close-scanner');
-    const scannerOverlay = document.getElementById('scanner-overlay');
-    const scannerVideo = document.getElementById('scanner-video');
-    const scannerCanvas = document.getElementById('scanner-canvas');
     const errorMsg = document.getElementById('error-msg');
-
-    let scannerActive = false;
-    let animationFrame = null;
 
     // Auto-uppercase input
     roomInput.addEventListener('input', (e) => {
@@ -116,151 +87,6 @@
         btnConnect.textContent = 'Conectar';
       }
     });
-
-    // Check if running in Android WebView
-    const isAndroidWebView = () => {
-      return typeof AndroidInterface !== 'undefined';
-    };
-
-    // QR Scanner
-    btnScan.addEventListener('click', async () => {
-      // If in Android WebView, show message to use manual entry
-      if (isAndroidWebView()) {
-        alert('En la app Android, por favor ingresa el codigo manualmente.\n\nEjemplo: RAY-ABCD');
-        roomInput.focus();
-        return;
-      }
-
-      // Otherwise try web-based scanner
-      try {
-        console.log('Requesting camera access...');
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }
-        });
-        console.log('Camera access granted');
-        scannerVideo.srcObject = stream;
-        scannerOverlay.classList.remove('hidden');
-        scannerActive = true;
-
-        // Wait for video to be ready
-        scannerVideo.onloadedmetadata = () => {
-          console.log('Video metadata loaded');
-          scanQRCode();
-        };
-
-        // Timeout if camera doesn't load
-        setTimeout(() => {
-          if (scannerActive && scannerVideo.readyState < 2) {
-            console.error('Camera timeout');
-            stopScanner();
-            alert('La camara no responde. Intenta ingresar el codigo manualmente.');
-          }
-        }, 5000);
-
-      } catch (err) {
-        console.error('Camera access denied:', err);
-        alert('No se pudo acceder a la camara: ' + err.message + '\n\nIntenta ingresar el codigo manualmente.');
-      }
-    });
-
-    // Function called from Android when QR is scanned
-    window.onQRCodeScanned = (code) => {
-      try {
-        const url = new URL(code);
-        const roomCode = url.searchParams.get('code');
-        if (roomCode && roomCode.startsWith('RAY-')) {
-          connectToRoom(roomCode).then(() => {
-            window.location.href = `chat.html?room=${roomCode}`;
-          });
-        } else if (code.includes('RAY-')) {
-          // Direct code in QR
-          const match = code.match(/RAY-[A-Z0-9]+/);
-          if (match) {
-            connectToRoom(match[0]).then(() => {
-              window.location.href = `chat.html?room=${match[0]}`;
-            });
-          }
-        }
-      } catch (e) {
-        // If not a URL, try to extract code directly
-        const match = code.match(/RAY-[A-Z0-9]+/);
-        if (match) {
-          connectToRoom(match[0]).then(() => {
-            window.location.href = `chat.html?room=${match[0]}`;
-          });
-        }
-      }
-    };
-
-    // Fix: Add multiple event listeners for better reliability
-    btnCloseScanner.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      stopScanner();
-    });
-
-    btnCloseScanner.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      stopScanner();
-    });
-
-    // Also close on overlay background click (but not on the frame)
-    scannerOverlay.addEventListener('click', (e) => {
-      if (e.target === scannerOverlay) {
-        stopScanner();
-      }
-    });
-
-    function stopScanner() {
-      console.log('Stopping scanner...');
-      scannerActive = false;
-      if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
-        animationFrame = null;
-      }
-      if (scannerVideo.srcObject) {
-        scannerVideo.srcObject.getTracks().forEach(track => {
-          track.stop();
-        });
-        scannerVideo.srcObject = null;
-      }
-      scannerOverlay.classList.add('hidden');
-      console.log('Scanner stopped');
-    }
-
-    function scanQRCode() {
-      if (!scannerActive) return;
-
-      const canvas = scannerCanvas;
-      const ctx = canvas.getContext('2d');
-
-      if (scannerVideo.readyState === scannerVideo.HAVE_ENOUGH_DATA) {
-        canvas.width = scannerVideo.videoWidth;
-        canvas.height = scannerVideo.videoHeight;
-        ctx.drawImage(scannerVideo, 0, 0, canvas.width, canvas.height);
-
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'dontInvert'
-        });
-
-        if (code) {
-          const url = new URL(code.data);
-          const roomCode = url.searchParams.get('code');
-
-          if (roomCode && roomCode.startsWith('RAY-')) {
-            stopScanner();
-            connectToRoom(roomCode).then(() => {
-              window.location.href = `chat.html?room=${roomCode}`;
-            });
-            return;
-          }
-        }
-      }
-
-      animationFrame = requestAnimationFrame(scanQRCode);
-    }
 
     // Check for stored room
     const storedRoom = localStorage.getItem('ray_current_room');
